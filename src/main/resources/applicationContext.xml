@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:stargate="http://fengchao.baidu.com/dtd/schema/stargate"
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+		http://www.springframework.org/schema/tx
+		http://www.springframework.org/schema/tx/spring-tx-3.0.xsd
+		http://www.springframework.org/schema/aop
+		http://www.springframework.org/schema/aop/spring-aop-3.0.xsd
+		http://www.springframework.org/schema/context
+		http://www.springframework.org/schema/context/spring-context-3.0.xsd
+		http://fengchao.baidu.com/dtd/schema/stargate
+		http://fengchao.baidu.com/dtd/schema/stargate/stargate.xsd">
+
+	<!-- config -->
+	<bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>classpath:dts.properties</value>
+			</list>
+		</property>
+		<property name="placeholderPrefix">
+			<value>#[</value>
+		</property>
+		<property name="placeholderSuffix">
+			<value>]</value>
+		</property>
+	</bean>
+	
+	<bean id="dataSourceParent" destroy-method="close" abstract="true">
+		<property name="driverClass">
+			<value>#[jdbc.driverClassName]</value>
+		</property>
+		<property name="maxPoolSize">
+			<value>#[default.maxPoolSize]</value>
+		</property>
+		<property name="minPoolSize">
+			<value>#[default.minPoolSize]</value>
+		</property>
+		<property name="initialPoolSize">
+			<value>#[default.initialPoolSize]</value>
+		</property>
+		<property name="idleConnectionTestPeriod">
+			<value>#[default.idleConnectionTestPeriod]</value>
+		</property>
+		<property name="maxIdleTime">
+			<value>#[default.maxIdleTime]</value>
+		</property>
+	</bean>
+	
+	<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource" destroy-method="close" parent="dataSourceParent">
+		<property name="jdbcUrl">
+			<value>#[db.url]</value>
+		</property>
+		<property name="user">
+			<value>#[db.username]</value>
+		</property>
+		<property name="password">
+			<value>#[db.password]</value>
+		</property>
+	</bean>
+
+	<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+		<property name="dataSource">
+			<ref bean="dataSource" />
+		</property>
+	</bean>
+	    
+    <!-- log & back up -->
+    <bean id="temDao" class="tianci.pinao.dts.tasks.dao.impl.TemDaoImpl">
+		<property name="jdbcTemplate" ref="jdbcTemplate" />
+    </bean>
+    <bean id="temTaskService" class="tianci.pinao.dts.tasks.service.impl.TemTaskServiceImpl">
+		<property name="temDao" ref="temDao" />
+		
+		<property name="saveStock">
+			<value>#[tem.stock]</value>
+		</property>
+		<property name="saveReferTem">
+			<value>#[tem.referTem]</value>
+		</property>
+		<property name="channelsService" ref="channelsService" />
+    </bean>
+    
+    <bean id="logTemTask" class ="tianci.pinao.dts.tasks.LogTemTask">
+		<property name="temTaskService" ref="temTaskService" />
+    </bean>
+    <bean id="readTemTask" class ="tianci.pinao.dts.tasks.ReadTemTask">
+		<property name="temTaskService" ref="temTaskService" />
+    </bean>
+    <bean id="saveTemTask" class ="tianci.pinao.dts.tasks.SaveTemTask">
+		<property name="temTaskService" ref="temTaskService" />
+    </bean>
+
+	<bean id="saveTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="saveTemTask" />
+		<property name="targetMethod" value="run" />
+	</bean>
+	<bean id="readTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="readTemTask" />
+		<property name="targetMethod" value="run" />
+	</bean>
+	<bean id="logTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="logTemTask" />
+		<property name="targetMethod" value="run" />
+	</bean>
+	
+	<bean id="saveTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
+		<property name="jobDetail" ref="saveTemTaskJob" />
+	    <property name="startDelay" value="1000" />
+	    <property name="repeatInterval" value="100" />
+	    <property name="repeatCount" value="-1" />
+	</bean>
+	<bean id="readTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
+		<property name="jobDetail" ref="readTemTaskJob" />
+	    <property name="startDelay" value="1000" />
+	    <property name="repeatInterval" value="100" />
+	    <property name="repeatCount" value="-1" />
+	</bean>
+	<bean id="logTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
+		<property name="jobDetail" ref="logTemTaskJob" />
+	    <property name="startDelay" value="1000" />
+	    <property name="repeatInterval" value="100" />
+	    <property name="repeatCount" value="-1" />
+	</bean>
+	
+	<bean class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
+		<property name="taskExecutor">
+			<bean class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+				<property name="corePoolSize" value="40" />
+				<property name="maxPoolSize" value="500" />
+				<property name="queueCapacity" value="10" />
+				<property name="waitForTasksToCompleteOnShutdown" value="false" />
+			</bean>
+		</property>
+		<property name="triggers">
+			<list>
+                <!--<ref bean="logTemTaskTrigger" />
+                ref bean="saveTemTaskTrigger" />
+                <ref bean="readTemTaskTrigger" /-->
+			</list>
+		</property>
+	</bean>
+</beans>
