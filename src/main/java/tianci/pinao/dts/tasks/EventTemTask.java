@@ -5,7 +5,7 @@ import org.apache.commons.logging.LogFactory;
 
 import tianci.pinao.dts.services.TemService;
 
-public class LogTemTask implements Runnable {
+public class EventTemTask implements Runnable {
 
 	private final Log logger = LogFactory.getLog(getClass());
 	
@@ -14,10 +14,10 @@ public class LogTemTask implements Runnable {
 	@Override
 	public void run() {
 		try {
-			temService.logTem();
+			temService.eventTem();
 		} catch (Throwable t) {
 			if(logger.isErrorEnabled())
-				logger.error("Error in logging tem >> ", t);
+				logger.error("Error in eventing tem >> ", t);
 		}
 	}
 

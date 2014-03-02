@@ -8,6 +8,10 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 
 public class Temperature {
 	
+	public static final int STATUS_NEW = 0;
+	
+	public static final int STATUS_ALARMED = 1;
+	
 	private int channel;
 	
 	private String tem;
@@ -21,6 +25,8 @@ public class Temperature {
 	private int ret;
 	
 	private Date date;
+	
+	private int status;
 
 	public int getChannel() {
 		return channel;
@@ -91,5 +97,13 @@ public class Temperature {
 	@Override
 	public String toString() {
 		return ToStringBuilder.reflectionToString(this);
+	}
+
+	public int getStatus() {
+		return status;
+	}
+
+	public void setStatus(int status) {
+		this.status = status;
 	}
 }

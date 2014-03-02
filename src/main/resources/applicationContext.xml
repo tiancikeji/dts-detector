@@ -68,62 +68,104 @@
 			<ref bean="dataSource" />
 		</property>
 	</bean>
+	
+	<bean id="logDao" class="tianci.pinao.dts.tasks.dao.impl.LogDaoImpl">
+		<property name="jdbcTemplate" ref="jdbcTemplate" />
+	</bean>
+	<bean id="alarmDao" class="tianci.pinao.dts.tasks.dao.impl.AlarmDaoImpl">
+		<property name="jdbcTemplate" ref="jdbcTemplate" />
+	</bean>
+	<bean id="temDao" class="tianci.pinao.dts.tasks.dao.impl.TemDaoImpl">
+		<property name="jdbcTemplate" ref="jdbcTemplate" />
+	</bean>
+	<bean id="configDao" class="tianci.pinao.dts.tasks.dao.impl.ConfigDaoImpl">
+		<property name="jdbcTemplate" ref="jdbcTemplate" />
+	</bean>
+	<bean id="areaDao" class="tianci.pinao.dts.tasks.dao.impl.AreaDaoImpl">
+		<property name="jdbcTemplate" ref="jdbcTemplate" />
+	</bean>
+	
+	<bean id="temService" class="tianci.pinao.dts.services.impl.TemServiceImpl">
+		<property name="areaDao" ref="areaDao" />
+		<property name="configDao" ref="configDao" />
+		<property name="temDao" ref="temDao" />
+		<property name="alarmDao" ref="alarmDao" />
+	</bean>
+	<bean id="logService" class="tianci.pinao.dts.services.impl.LogServiceImpl">
+		<property name="logDao" ref="logDao" />
+	</bean>
+	
+	<bean id="serverLifeTimeRecordTask" class="tianci.pinao.dts.task.ServerLifeTimeRecordTask" 
+		init-method="init" destroy-method="destroy">
+		<property name="logService" ref="logService" />
+	</bean>
 	    
     <!-- log & back up -->
-    <bean id="temDao" class="tianci.pinao.dts.tasks.dao.impl.TemDaoImpl">
-		<property name="jdbcTemplate" ref="jdbcTemplate" />
-    </bean>
-    <bean id="temTaskService" class="tianci.pinao.dts.tasks.service.impl.TemTaskServiceImpl">
-		<property name="temDao" ref="temDao" />
-		
-		<property name="saveStock">
-			<value>#[tem.stock]</value>
-		</property>
-		<property name="saveReferTem">
-			<value>#[tem.referTem]</value>
-		</property>
-		<property name="channelsService" ref="channelsService" />
-    </bean>
-    
-    <bean id="logTemTask" class ="tianci.pinao.dts.tasks.LogTemTask">
-		<property name="temTaskService" ref="temTaskService" />
-    </bean>
     <bean id="readTemTask" class ="tianci.pinao.dts.tasks.ReadTemTask">
-		<property name="temTaskService" ref="temTaskService" />
+		<property name="temService" ref="temService" />
     </bean>
     <bean id="saveTemTask" class ="tianci.pinao.dts.tasks.SaveTemTask">
-		<property name="temTaskService" ref="temTaskService" />
+		<property name="temService" ref="temService" />
+    </bean>
+    <bean id="checkTemTask" class ="tianci.pinao.dts.tasks.CheckTemTask">
+		<property name="temService" ref="temService" />
+    </bean>
+    <bean id="logTemTask" class ="tianci.pinao.dts.tasks.LogTemTask">
+		<property name="temService" ref="temService" />
+    </bean>
+    <bean id="eventTemTask" class ="tianci.pinao.dts.tasks.EventTemTask">
+		<property name="temService" ref="temService" />
     </bean>
 
+	<bean id="readTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="readTemTask" />
+		<property name="targetMethod" value="run" />
+	</bean>
 	<bean id="saveTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
 		<property name="targetObject" ref="saveTemTask" />
 		<property name="targetMethod" value="run" />
 	</bean>
-	<bean id="readTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
-		<property name="targetObject" ref="readTemTask" />
+	<bean id="checkTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="checkTemTask" />
 		<property name="targetMethod" value="run" />
 	</bean>
 	<bean id="logTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
 		<property name="targetObject" ref="logTemTask" />
 		<property name="targetMethod" value="run" />
 	</bean>
-	
-	<bean id="saveTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
-		<property name="jobDetail" ref="saveTemTaskJob" />
-	    <property name="startDelay" value="1000" />
-	    <property name="repeatInterval" value="100" />
-	    <property name="repeatCount" value="-1" />
+	<bean id="eventTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="eventTemTask" />
+		<property name="targetMethod" value="run" />
 	</bean>
+	
 	<bean id="readTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
 		<property name="jobDetail" ref="readTemTaskJob" />
 	    <property name="startDelay" value="1000" />
-	    <property name="repeatInterval" value="100" />
+	    <property name="repeatInterval" value="1000" />
+	    <property name="repeatCount" value="-1" />
+	</bean>
+	<bean id="saveTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
+		<property name="jobDetail" ref="saveTemTaskJob" />
+	    <property name="startDelay" value="2000" />
+	    <property name="repeatInterval" value="1000" />
+	    <property name="repeatCount" value="-1" />
+	</bean>
+	<bean id="checkTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
+		<property name="jobDetail" ref="checkTemTaskJob" />
+	    <property name="startDelay" value="3000" />
+	    <property name="repeatInterval" value="10000" />
 	    <property name="repeatCount" value="-1" />
 	</bean>
 	<bean id="logTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
 		<property name="jobDetail" ref="logTemTaskJob" />
-	    <property name="startDelay" value="1000" />
-	    <property name="repeatInterval" value="100" />
+	    <property name="startDelay" value="4000" />
+	    <property name="repeatInterval" value="600000" />
+	    <property name="repeatCount" value="-1" />
+	</bean>
+	<bean id="eventTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
+		<property name="jobDetail" ref="eventTemTaskJob" />
+	    <property name="startDelay" value="5000" />
+	    <property name="repeatInterval" value="600000" />
 	    <property name="repeatCount" value="-1" />
 	</bean>
 	

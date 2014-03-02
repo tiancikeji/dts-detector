@@ -7,15 +7,20 @@ import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.NumberUtils;
+import org.apache.commons.lang.time.DateUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.transaction.annotation.Transactional;
 
 import tianci.pinao.dts.models.Channel;
 import tianci.pinao.dts.models.Config;
@@ -23,6 +28,7 @@ import tianci.pinao.dts.models.Machine;
 import tianci.pinao.dts.models.Temperature;
 import tianci.pinao.dts.sal.TemMonitor;
 import tianci.pinao.dts.services.TemService;
+import tianci.pinao.dts.tasks.dao.AlarmDao;
 import tianci.pinao.dts.tasks.dao.AreaDao;
 import tianci.pinao.dts.tasks.dao.ConfigDao;
 import tianci.pinao.dts.tasks.dao.TemDao;
@@ -33,16 +39,27 @@ public class TemServiceImpl implements TemService {
 	private Log logger = LogFactory.getLog(getClass());
 
 	private String machineId;
+	
+	private int eventTime = -7200000;
+	
+	private int eventStartTime = -3600000;
+	
+	private int eventEndTime = 3600000;
+	
+	private int logTime = 3600000;
 
 	private String path = PinaoConstants.TEM_PATH;
 	
 	private File dir = new File(path);
 	
+	//*****//
 	private AreaDao areaDao;
 	
 	private ConfigDao configDao;
 	
 	private TemDao temDao;
+	
+	private AlarmDao alarmDao;
 	
 	public TemServiceImpl(){
 		// load DLL
@@ -53,7 +70,127 @@ public class TemServiceImpl implements TemService {
 	}
 
 	@Override
+	@Transactional(rollbackFor=Exception.class, value="txManager")
+	public void eventTem() {
+		if(logger.isInfoEnabled())
+			logger.info("Starting event tem");
+		long start = System.currentTimeMillis();
+		try{
+			// get data from temperature - last 2 hour's alarm time
+			Date startDate = DateUtils.addMilliseconds(new Date(), eventTime);
+			List<Date> alarmDates = alarmDao.getAlarmDates(startDate);
+			
+			if(alarmDates != null && alarmDates.size() > 0){
+				Collections.sort(alarmDates, new Comparator<Date>() {
+					@Override
+					public int compare(Date d1, Date d2) {
+						return d1.before(d2) ? 0 : 1;
+					}
+				});
+				
+				Date startTmp = DateUtils.addMilliseconds(alarmDates.get(0), eventStartTime);
+				Date endTmp = DateUtils.addMilliseconds(alarmDates.get(alarmDates.size() - 1), eventEndTime);
+				
+				// event data
+				temDao.copyTemToEvent(startTmp, endTmp);
+				
+				// remove tmp data
+				temDao.removeTemFromTmp(startTmp, endTmp);
+			}
+			
+			// remove tmp data
+			temDao.removeTemFromTmp(startDate);
+		} finally {
+	    	if(logger.isInfoEnabled())
+	    		logger.info("eventTem used <" + (System.currentTimeMillis() - start) + ">");	
+		}
+	}
+
+	@Override
+	@Transactional(rollbackFor=Exception.class, value="txManager")
+	public void logTem() {
+		if(logger.isInfoEnabled())
+			logger.info("Starting log tem");
+		long start = System.currentTimeMillis();
+		try{
+			// get data from temperature - 1 hour ago & status:1
+			Date endDate = DateUtils.addMilliseconds(new Date(), logTime);
+			List<Temperature> tems = temDao.getTemsByDateNStatus(endDate, Temperature.STATUS_ALARMED);
+			if(tems != null && tems.size() > 0){
+				// get log interval
+				Config config = configDao.getConfigs().get(Config.TYPE_BACK_INTERVAL_FLAG);
+				
+				// NOTE: no back up by default!!!
+				if(config != null && config.getValue() > 0){
+					int logInterval = new Long(config.getValue()).intValue();
+					
+					// filter log data
+					Map<Integer, List<Temperature>> tmps = sortTempsByChannel(tems);
+					
+					List<Temperature> logs = new ArrayList<Temperature>();
+					Map<Integer, Date> maxDates = temDao.getMaxDateFromLog();
+					
+					for(Integer channel : tmps.keySet()){
+						Date maxDate = maxDates.get(channel);
+						if(maxDate != null)
+							maxDate = DateUtils.addMinutes(maxDate, logInterval);
+						
+						List<Temperature> tmp = tmps.get(channel);
+						
+						if(tmp != null && tmps.size() > 0)
+							for(Temperature tem : tmp)
+								if(tem != null && tem.getDate() != null && (maxDate == null || maxDate.before(tem.getDate()))){
+									logs.add(tem);
+									maxDate = DateUtils.addMinutes(tem.getDate(), logInterval);
+								}
+					}
+					
+					// insert filtered into log
+					if(logs != null && logs.size() > 0)
+						temDao.copyTemToLog(logs);
+				}
+				
+				// insert all into tmp
+				temDao.copyTemToTmp(endDate, Temperature.STATUS_ALARMED);
+				
+				// remove from temperature
+				temDao.removeTemFromTem(endDate, Temperature.STATUS_ALARMED);
+			}
+		} finally {
+	    	if(logger.isInfoEnabled())
+	    		logger.info("logTem used <" + (System.currentTimeMillis() - start) + ">");	
+		}
+	}
+
+	private Map<Integer, List<Temperature>> sortTempsByChannel(List<Temperature> tems) {
+		Map<Integer, List<Temperature>> tmps = new HashMap<Integer, List<Temperature>>();
+		for(Temperature tem : tems)
+			if(tem != null){
+				List<Temperature> _tmp = tmps.get(tem.getChannel());
+				if(_tmp == null){
+					_tmp = new ArrayList<Temperature>();
+					tmps.put(tem.getChannel(), _tmp);
+				}
+				_tmp.add(tem);
+			}
+		
+		// sort
+		for(Integer key : tmps.keySet())
+			Collections.sort(tmps.get(key), new Comparator<Temperature>() {
+				@Override
+				public int compare(Temperature t1, Temperature t2) {
+					Date d1 = t1.getDate();
+					Date d2 = t2.getDate();
+					return d1.before(d2) ? 0 : 1;
+				}
+			});
+		return tmps;
+	}
+
+	@Override
 	public void saveTem() {
+		if(logger.isInfoEnabled())
+			logger.info("Starting save tem");
 		long start = System.currentTimeMillis();
 		try{
 	    	// read files
@@ -85,9 +222,10 @@ public class TemServiceImpl implements TemService {
 		File path = new File(file.getAbsolutePath() + PinaoConstants.TEM_WRITE_SUFFIX);
 		file.renameTo(path);
 		
+		List<Temperature> tems = null;
 		try{
 			// read file-data
-			List<Temperature> tems = readTemDataFromFile(path);
+			tems = readTemDataFromFile(path);
 			
 			Date date = null;
 			long tmp = NumberUtils.toLong(StringUtils.removeEnd(path.getName(), PinaoConstants.TEM_WRITE_SUFFIX), -1);
@@ -108,9 +246,9 @@ public class TemServiceImpl implements TemService {
 		// delete files
 		path.delete();
 		
-		// TODO check alarm logic
-		
-		// TODO alarm...
+		// check & alarm logic
+		if(tems != null && tems.size() > 0)
+			checkNAlarm(tems);
 	}
 
 	public List<Temperature> readTemDataFromFile(File path) throws FileNotFoundException {
@@ -131,6 +269,7 @@ public class TemServiceImpl implements TemService {
 						tem.setUnstock(cols[3]);
 					if(cols.length > 5)
 						tem.setReferTem(NumberUtils.toDouble(cols[4]));
+					tem.setStatus(Temperature.STATUS_NEW);
 					data.add(tem);
 				}
 			}
@@ -314,6 +453,35 @@ public class TemServiceImpl implements TemService {
 		}
 	}
 
+	@Override
+	public void checkTem() {
+		if(logger.isInfoEnabled())
+			logger.info("Starting check tem");
+		long start = System.currentTimeMillis();
+		
+		try{
+			List<Temperature> tems = temDao.getTemsByStatus(Temperature.STATUS_NEW);
+			
+			if(tems != null && tems.size() > 0)
+				checkNAlarm(tems);
+		} finally{
+			if(logger.isInfoEnabled())
+				logger.info("End check tem used <" + (System.currentTimeMillis() - start) + ">");
+		}
+	}
+
+	private void checkNAlarm(List<Temperature> tems) {
+		// TODO Auto-generated method stub
+		// check alarm logic
+		
+		// add alarm record
+		
+		// log tem data to event
+		
+		// update status
+		temDao.updateTemsStatus(tems, Temperature.STATUS_ALARMED);
+	}
+
 	public String getMachineId() {
 		return machineId;
 	}
@@ -360,5 +528,45 @@ public class TemServiceImpl implements TemService {
 
 	public void setTemDao(TemDao temDao) {
 		this.temDao = temDao;
+	}
+
+	public int getEventTime() {
+		return eventTime;
+	}
+
+	public void setEventTime(int eventTime) {
+		this.eventTime = eventTime;
+	}
+
+	public int getLogTime() {
+		return logTime;
+	}
+
+	public void setLogTime(int logTime) {
+		this.logTime = logTime;
+	}
+
+	public AlarmDao getAlarmDao() {
+		return alarmDao;
+	}
+
+	public void setAlarmDao(AlarmDao alarmDao) {
+		this.alarmDao = alarmDao;
+	}
+
+	public int getEventStartTime() {
+		return eventStartTime;
+	}
+
+	public void setEventStartTime(int eventStartTime) {
+		this.eventStartTime = eventStartTime;
+	}
+
+	public int getEventEndTime() {
+		return eventEndTime;
+	}
+
+	public void setEventEndTime(int eventEndTime) {
+		this.eventEndTime = eventEndTime;
 	}
 }
