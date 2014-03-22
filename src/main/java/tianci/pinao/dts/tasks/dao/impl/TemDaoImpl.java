@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang.StringUtils;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.support.JdbcDaoSupport;
@@ -72,21 +73,22 @@ public class TemDaoImpl extends JdbcDaoSupport implements TemDao {
 	}
 
 	@Override
-	public List<Temperature> getTemsByStatus(int status) {
-		return getJdbcTemplate().query("select channel, tem, date from " + SqlConstants.TABLE_TEMPERATURE + " where status = ?", 
+	public List<Temperature> getTemsByStatus(List<Integer> cIds, int status) {
+		return getJdbcTemplate().query("select channel, tem, stock, unstock, date from " + SqlConstants.TABLE_TEMPERATURE + " where status = ? and channel in (" + StringUtils.join(cIds, ",") + ")", 
 				new Object[]{status}, new RowMapper<Temperature>(){
 
 					@Override
 					public Temperature mapRow(ResultSet rs, int index) throws SQLException {
-						Temperature tem = new Temperature();
-						
-						tem.setChannel(rs.getInt("channel"));
-						tem.setTem(rs.getString("tem"));
+						Temperature temp = new Temperature();
+						temp.setChannel(rs.getInt("channel"));
+						temp.setTem(rs.getString("tem"));
+						temp.setStock(rs.getString("stock"));
+						temp.setUnstock(rs.getString("unstock"));
 						Timestamp ts = rs.getTimestamp("date");
 						if(ts != null)
-							tem.setDate(new Date(ts.getTime()));
+							temp.setDate(new Date(ts.getTime()));
 						
-						return tem;
+						return temp;
 					}
 				});
 	}
@@ -174,6 +176,28 @@ public class TemDaoImpl extends JdbcDaoSupport implements TemDao {
 	@Override
 	public void removeTemFromTmp(Date start, Date end) {
 		getJdbcTemplate().update("delete from " + SqlConstants.TABLE_TEMPERATURE_TMP + " where date between ? and ?", new Object[]{start, end});
+	}
+
+	@Override
+	public List<Temperature> getTemsByIds(int channel, Date date, int limit) {
+		return getJdbcTemplate().query("select channel, tem, stock, unstock, date from " + SqlConstants.TABLE_TEMPERATURE + " where channel = ? and date < ? order by date desc limit ?", 
+				new Object[]{channel, date, limit}, new RowMapper<Temperature>(){
+
+			@Override
+			public Temperature mapRow(ResultSet rs, int index) throws SQLException {
+				Temperature temp = new Temperature();
+				temp.setChannel(rs.getInt("channel"));
+				temp.setTem(rs.getString("tem"));
+				temp.setStock(rs.getString("stock"));
+				temp.setUnstock(rs.getString("unstock"));
+				Timestamp ts = rs.getTimestamp("date");
+				if(ts != null)
+					temp.setDate(new Date(ts.getTime()));
+				
+				return temp;
+			}
+			
+		});
 	}
 }
 

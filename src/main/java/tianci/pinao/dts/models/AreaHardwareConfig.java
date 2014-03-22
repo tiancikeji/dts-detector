@@ -6,37 +6,21 @@ import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
 
-public class Config {
-	
-	public static final int TYPE_LIFE_TIME_FLAG = 1;
-	
-	public static final int TYPE_STOCK_FLAG = 2;
-	
-	public static final int TYPE_REFER_TEM_FLAG = 3;
-	
-	public static final int TYPE_BACK_INTERVAL_FLAG = 4;
-	
-	public static final int TYPE_REFRESH_INTERVAL_FLAG = 5;
-	
-	public static final int TYPE_STOCK_THRELHOLD = 6;
-	
-	public static final int TYPE_UNSTOCK_THRELHOLD = 7;
-	
-	public static final int TYPE_TEMPERATURE_EXTREME_HIGH = 8;
-	
-	public static final int TYPE_TEMPERATURE_EXTREME_LOW = 9;
-	
-	public static final int TYPE_FREE_SPACE_RATE = 10;
-	
-	public static final int VALUE_SAVE = 1;
+public class AreaHardwareConfig {
 
 	private int id;
 	
-	private int type;
+	private int areaid;
 	
-	private long value;
+	private String areaName;
 	
-	private long used;
+	private String relay1;
+	
+	private String light;
+	
+	private String relay;
+	
+	private String voice;
 	
 	private Date lastModTime;
 	
@@ -50,20 +34,36 @@ public class Config {
 		this.id = id;
 	}
 
-	public int getType() {
-		return type;
+	public int getAreaid() {
+		return areaid;
 	}
 
-	public void setType(int type) {
-		this.type = type;
+	public void setAreaid(int areaid) {
+		this.areaid = areaid;
 	}
 
-	public long getValue() {
-		return value;
+	public String getLight() {
+		return light;
 	}
 
-	public void setValue(long value) {
-		this.value = value;
+	public void setLight(String light) {
+		this.light = light;
+	}
+
+	public String getRelay() {
+		return relay;
+	}
+
+	public void setRelay(String relay) {
+		this.relay = relay;
+	}
+
+	public String getVoice() {
+		return voice;
+	}
+
+	public void setVoice(String voice) {
+		this.voice = voice;
 	}
 
 	public Date getLastModTime() {
@@ -97,11 +97,19 @@ public class Config {
 		return ToStringBuilder.reflectionToString(this);
 	}
 
-	public long getUsed() {
-		return used;
+	public String getAreaName() {
+		return areaName;
 	}
 
-	public void setUsed(long used) {
-		this.used = used;
+	public void setAreaName(String areaName) {
+		this.areaName = areaName;
+	}
+
+	public String getRelay1() {
+		return relay1;
+	}
+
+	public void setRelay1(String relay1) {
+		this.relay1 = relay1;
 	}
 }

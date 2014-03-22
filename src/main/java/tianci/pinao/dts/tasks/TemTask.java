@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import tianci.pinao.dts.services.TemService;
 
 @Service
-public class ReadTemTask implements Runnable {
+public class TemTask implements Runnable {
 
 	private final Log logger = LogFactory.getLog(getClass());
 
@@ -21,11 +21,15 @@ public class ReadTemTask implements Runnable {
     @Override
     public void run() {
     	try {
-    		if(lock.tryLock())
+    		if(lock.tryLock()){
     			temService.readTem();
+    			temService.saveTem();
+    			temService.checkTem();
+    			temService.alarmTem();
+    		}
     	} catch (Throwable e) {
     		if(logger.isErrorEnabled())
-    			logger.error("Exception when reading tem >> ", e);
+    			logger.error("Exception when circle tem >> ", e);
     	} finally{
     		lock.unlock();
     	}

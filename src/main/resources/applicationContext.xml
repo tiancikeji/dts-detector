@@ -90,18 +90,21 @@
 		<property name="configDao" ref="configDao" />
 		<property name="temDao" ref="temDao" />
 		<property name="alarmDao" ref="alarmDao" />
+		<property name="machineId">
+			<value>#[machine.id]</value>
+		</property>
 	</bean>
 	<bean id="logService" class="tianci.pinao.dts.services.impl.LogServiceImpl">
 		<property name="logDao" ref="logDao" />
 	</bean>
 	
-	<bean id="serverLifeTimeRecordTask" class="tianci.pinao.dts.task.ServerLifeTimeRecordTask" 
+	<bean id="serverLifeTimeRecordTask" class="tianci.pinao.dts.tasks.ServerLifeTimeRecordTask" 
 		init-method="init" destroy-method="destroy">
 		<property name="logService" ref="logService" />
 	</bean>
 	    
     <!-- log & back up -->
-    <bean id="readTemTask" class ="tianci.pinao.dts.tasks.ReadTemTask">
+    <!--bean id="readTemTask" class ="tianci.pinao.dts.tasks.ReadTemTask">
 		<property name="temService" ref="temService" />
     </bean>
     <bean id="saveTemTask" class ="tianci.pinao.dts.tasks.SaveTemTask">
@@ -109,15 +112,18 @@
     </bean>
     <bean id="checkTemTask" class ="tianci.pinao.dts.tasks.CheckTemTask">
 		<property name="temService" ref="temService" />
+    </bean-->
+    <bean id="temTask" class ="tianci.pinao.dts.tasks.TemTask">
+		<property name="temService" ref="temService" />
+    </bean>
+    <bean id="ctrlTemTask" class ="tianci.pinao.dts.tasks.CtrlTemTask">
+		<property name="temService" ref="temService" />
     </bean>
     <bean id="logTemTask" class ="tianci.pinao.dts.tasks.LogTemTask">
 		<property name="temService" ref="temService" />
     </bean>
-    <bean id="eventTemTask" class ="tianci.pinao.dts.tasks.EventTemTask">
-		<property name="temService" ref="temService" />
-    </bean>
 
-	<bean id="readTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+	<!--bean id="readTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
 		<property name="targetObject" ref="readTemTask" />
 		<property name="targetMethod" value="run" />
 	</bean>
@@ -128,17 +134,21 @@
 	<bean id="checkTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
 		<property name="targetObject" ref="checkTemTask" />
 		<property name="targetMethod" value="run" />
+	</bean-->
+	<bean id="temTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="temTask" />
+		<property name="targetMethod" value="run" />
+	</bean>
+	<bean id="ctrlTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="ctrlTemTask" />
+		<property name="targetMethod" value="run" />
 	</bean>
 	<bean id="logTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
 		<property name="targetObject" ref="logTemTask" />
 		<property name="targetMethod" value="run" />
 	</bean>
-	<bean id="eventTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
-		<property name="targetObject" ref="eventTemTask" />
-		<property name="targetMethod" value="run" />
-	</bean>
 	
-	<bean id="readTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
+	<!--bean id="readTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
 		<property name="jobDetail" ref="readTemTaskJob" />
 	    <property name="startDelay" value="1000" />
 	    <property name="repeatInterval" value="1000" />
@@ -155,16 +165,22 @@
 	    <property name="startDelay" value="3000" />
 	    <property name="repeatInterval" value="10000" />
 	    <property name="repeatCount" value="-1" />
+	</bean-->
+	<bean id="temTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
+		<property name="jobDetail" ref="temTaskJob" />
+	    <property name="startDelay" value="1000" />
+	    <property name="repeatInterval" value="1000" />
+	    <property name="repeatCount" value="-1" />
+	</bean>
+	<bean id="ctrlTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
+		<property name="jobDetail" ref="ctrlTemTaskJob" />
+	    <property name="startDelay" value="200" />
+	    <property name="repeatInterval" value="200" />
+	    <property name="repeatCount" value="-1" />
 	</bean>
 	<bean id="logTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
 		<property name="jobDetail" ref="logTemTaskJob" />
 	    <property name="startDelay" value="4000" />
-	    <property name="repeatInterval" value="600000" />
-	    <property name="repeatCount" value="-1" />
-	</bean>
-	<bean id="eventTemTaskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
-		<property name="jobDetail" ref="eventTemTaskJob" />
-	    <property name="startDelay" value="5000" />
 	    <property name="repeatInterval" value="600000" />
 	    <property name="repeatCount" value="-1" />
 	</bean>
@@ -180,9 +196,9 @@
 		</property>
 		<property name="triggers">
 			<list>
-                <!--<ref bean="logTemTaskTrigger" />
-                ref bean="saveTemTaskTrigger" />
-                <ref bean="readTemTaskTrigger" /-->
+                <!--<ref bean="temTaskTrigger" />
+                ref bean="ctrlTemTaskTrigger" />
+                <ref bean="logTemTaskTrigger" /-->
 			</list>
 		</property>
 	</bean>

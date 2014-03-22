@@ -5,31 +5,29 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.stereotype.Service;
 
 import tianci.pinao.dts.services.TemService;
 
-@Service
-public class ReadTemTask implements Runnable {
+public class CtrlTemTask implements Runnable {
 
 	private final Log logger = LogFactory.getLog(getClass());
-
+	
 	private TemService temService;
 	
 	private Lock lock = new ReentrantLock();
-	
-    @Override
-    public void run() {
-    	try {
-    		if(lock.tryLock())
-    			temService.readTem();
-    	} catch (Throwable e) {
-    		if(logger.isErrorEnabled())
-    			logger.error("Exception when reading tem >> ", e);
-    	} finally{
+
+	@Override
+	public void run() {
+		try {
+			if(lock.tryLock())
+    			temService.ctrlTem();
+		} catch (Throwable t) {
+			if(logger.isErrorEnabled())
+				logger.error("Error in ctrling tem >> ", t);
+		} finally{
     		lock.unlock();
     	}
-    }
+	}
 
 	public TemService getTemService() {
 		return temService;

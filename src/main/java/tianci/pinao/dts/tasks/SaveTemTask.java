@@ -1,5 +1,8 @@
 package tianci.pinao.dts.tasks;
 
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -11,13 +14,18 @@ public class SaveTemTask implements Runnable {
 
 	private TemService temService;
 	
+	private Lock lock = new ReentrantLock();
+	
     @Override
     public void run() {
     	try{
-    		temService.saveTem();
+    		if(lock.tryLock())
+    			temService.saveTem();
     	} catch(Throwable t){
     		if(logger.isErrorEnabled())
     			logger.error("Exception when saving term >> ", t);
+    	} finally{
+    		lock.unlock();
     	}
     }
 

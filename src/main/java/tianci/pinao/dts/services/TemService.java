@@ -8,6 +8,10 @@ public interface TemService {
 
 	public void checkTem();
 
+	public void alarmTem();
+
+	public void ctrlTem();
+
 	public void logTem();
 
 	public void eventTem();

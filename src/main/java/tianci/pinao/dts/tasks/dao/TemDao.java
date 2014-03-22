@@ -12,7 +12,7 @@ public interface TemDao {
 
 	public void updateTemsStatus(List<Temperature> tems, int statusAlarmed);
 
-	public List<Temperature> getTemsByStatus(int status);
+	public List<Temperature> getTemsByStatus(List<Integer> cIds, int status);
 
 	public List<Temperature> getTemsByDateNStatus(Date endDate, int status);
 
@@ -29,5 +29,7 @@ public interface TemDao {
 	public void copyTemToEvent(Date start, Date end);
 
 	public void removeTemFromTmp(Date start, Date end);
+
+	public List<Temperature> getTemsByIds(int channel, Date date, int limit);
 
 }

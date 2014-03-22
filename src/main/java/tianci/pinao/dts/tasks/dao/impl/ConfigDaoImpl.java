@@ -19,7 +19,7 @@ public class ConfigDaoImpl extends JdbcDaoSupport implements ConfigDao {
 	@Override
 	public Map<Integer, Config> getConfigs() {
 		final Map<Integer, Config> configs = new HashMap<Integer, Config>();
-		getJdbcTemplate().query("select id, type, value, lastmod_time, lastmod_userid from " + SqlConstants.TABLE_CONFIG + " where isdel = ? and type in (" + Config.TYPE_STOCK_FLAG + "," + Config.TYPE_REFER_TEM_FLAG +")",  
+		getJdbcTemplate().query("select id, type, value, lastmod_time, lastmod_userid from " + SqlConstants.TABLE_CONFIG + " where isdel = ?",  
 				new Object[]{0}, new RowMapper<Config>(){
 
 					@Override

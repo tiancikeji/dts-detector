@@ -1,5 +1,8 @@
 package tianci.pinao.dts.tasks;
 
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -11,22 +14,28 @@ public class EventTemTask implements Runnable {
 	
 	private TemService temService;
 	
+	private Lock lock = new ReentrantLock();
+	
 	@Override
 	public void run() {
 		try {
-			temService.eventTem();
+			if(lock.tryLock())
+    			temService.eventTem();
 		} catch (Throwable t) {
 			if(logger.isErrorEnabled())
 				logger.error("Error in eventing tem >> ", t);
-		}
+		} finally{
+    		lock.unlock();
+    	}
 	}
 
-	public TemService getTemTaskService() {
+	public TemService getTemService() {
 		return temService;
 	}
 
-	public void setTemTaskService(TemService temTaskService) {
-		this.temService = temTaskService;
+	public void setTemService(TemService temService) {
+		this.temService = temService;
 	}
+
 }
 
