@@ -152,4 +152,11 @@ public class AlarmDaoImpl extends JdbcDaoSupport implements AlarmDao {
 		});
 	}
 
+	@Override
+	public boolean hasAlarm(int channel, Date start, Date end) {
+		int count = getJdbcTemplate().queryForInt("select count(1) from " + SqlConstants.TABLE_ALARM + " where channel_id = ? and add_time between ? and ?",
+				new Object[]{channel, start, end}); 
+		return count > 0;
+	}
+
 }

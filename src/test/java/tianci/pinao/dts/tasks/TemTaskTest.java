@@ -56,6 +56,14 @@ public class TemTaskTest extends TestCase {
 			task.ctrlTem();
 		}
 	}
+	
+	public void testLogTem(){
+		if(flag){
+			TemService task = getTemService();
+			
+			task.logTem();
+		}
+	}
 
 	private TemService getTemService() {
 		TemService task = new ClassPathXmlApplicationContext("applicationContext.xml").getBean("temService", TemService.class);

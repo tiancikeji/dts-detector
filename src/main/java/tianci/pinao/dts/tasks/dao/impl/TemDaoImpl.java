@@ -94,8 +94,8 @@ public class TemDaoImpl extends JdbcDaoSupport implements TemDao {
 	}
 
 	@Override
-	public List<Temperature> getTemsByDateNStatus(Date endDate, int status) {
-		return getJdbcTemplate().query("select channel, date from " + SqlConstants.TABLE_TEMPERATURE + " where date <= ? and status = ?", 
+	public List<Temperature> getTemsByDateNStatus(List<Integer> cIds, Date endDate, int status) {
+		return getJdbcTemplate().query("select channel, date from " + SqlConstants.TABLE_TEMPERATURE + " where channel in (" + StringUtils.join(cIds, ",") + ") and date <= ? and status = ?", 
 				new Object[]{endDate, status}, new RowMapper<Temperature>(){
 					@Override
 					public Temperature mapRow(ResultSet rs, int index) throws SQLException {
@@ -122,8 +122,22 @@ public class TemDaoImpl extends JdbcDaoSupport implements TemDao {
 	}
 
 	@Override
-	public void copyTemToLog(final List<Temperature> logs) {
-		getJdbcTemplate().batchUpdate("insert into " + SqlConstants.TABLE_TEMPERATURE_LOG + " select channel, tem, stock, unstock, refer_tem, date from " + SqlConstants.TABLE_TEMPERATURE + " where channel = ? and date = ?", 
+	public void copyTemToLog(final List<Temperature> logs, boolean stock, boolean refer) {
+		String sql = "insert into " + SqlConstants.TABLE_TEMPERATURE_LOG + " select channel, tem, ";
+		
+		if(stock)
+			sql += "stock, unstock, ";
+		else
+			sql += "null, null, ";
+		
+		if(refer)
+			sql += "refer_tem ";
+		else
+			sql += "null ";
+		
+		sql += ", date from " + SqlConstants.TABLE_TEMPERATURE + " where channel = ? and date = ?";
+		
+		getJdbcTemplate().batchUpdate(sql, 
 				new BatchPreparedStatementSetter() {
 					
 					@Override
@@ -145,10 +159,10 @@ public class TemDaoImpl extends JdbcDaoSupport implements TemDao {
 	}
 
 	@Override
-	public Map<Integer, Date> getMaxDateFromLog() {
+	public Map<Integer, Date> getMaxDateFromLog(List<Integer> cIds) {
 		final Map<Integer, Date> dates = new HashMap<Integer, Date>();
 		
-		getJdbcTemplate().query("select channel, max(date) as date from " + SqlConstants.TABLE_TEMPERATURE_LOG + " group by channel", new RowMapper<Date>(){
+		getJdbcTemplate().query("select channel, max(date) as date from " + SqlConstants.TABLE_TEMPERATURE_LOG + " where channel in (" + StringUtils.join(cIds, ",") + ") group by channel", new RowMapper<Date>(){
 			@Override
 			public Date mapRow(ResultSet rs, int index) throws SQLException {
 				int channel = rs.getInt("channel");

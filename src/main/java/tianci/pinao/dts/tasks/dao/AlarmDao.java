@@ -17,4 +17,6 @@ public interface AlarmDao {
 
 	public List<Alarm> getAlarms(List<Long> ids, Object[] status);
 
+	public boolean hasAlarm(int channel, Date start, Date end);
+
 }

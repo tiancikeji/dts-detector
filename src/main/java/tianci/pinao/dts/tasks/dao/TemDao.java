@@ -14,15 +14,15 @@ public interface TemDao {
 
 	public List<Temperature> getTemsByStatus(List<Integer> cIds, int status);
 
-	public List<Temperature> getTemsByDateNStatus(Date endDate, int status);
+	public List<Temperature> getTemsByDateNStatus(List<Integer> cIds, Date endDate, int status);
 
 	public void copyTemToTmp(Date endDate, int status);
 
 	public void removeTemFromTem(Date endDate, int status);
 
-	public void copyTemToLog(List<Temperature> logs);
+	public void copyTemToLog(List<Temperature> logs, boolean stock, boolean refer);
 
-	public Map<Integer, Date> getMaxDateFromLog();
+	public Map<Integer, Date> getMaxDateFromLog(List<Integer> cIds);
 
 	public void removeTemFromTmp(Date endDate);
 

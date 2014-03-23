@@ -123,47 +123,77 @@ public class TemServiceImpl implements TemService {
 		long start = System.currentTimeMillis();
 		try{
 			// get data from temperature - 1 hour ago & status:1
-			Date endDate = DateUtils.addMilliseconds(new Date(), logTime);
-			List<Temperature> tems = temDao.getTemsByDateNStatus(endDate, Temperature.STATUS_ALARMED);
-			if(tems != null && tems.size() > 0){
-				// get log interval
-				Config config = configDao.getConfigs().get(Config.TYPE_BACK_INTERVAL_FLAG);
+			List<Machine> machines = areaDao.getMachineByName(machineId);
+			if(machines != null && machines.size() > 0){
+				List<Long> ids = new ArrayList<Long>();
+				for(Machine machine : machines)
+					ids.add(new Long(machine.getId()));
 				
-				// NOTE: no back up by default!!!
-				if(config != null && config.getValue() > 0){
-					int logInterval = new Long(config.getValue()).intValue();
+				List<Channel> channels = areaDao.getAllChannelsByMachineIds(ids);
+				if(channels != null && channels.size() > 0){
+					List<Integer> cIds = new ArrayList<Integer>();
+					for(Channel channel : channels)
+						cIds.add(channel.getId());
 					
-					// filter log data
-					Map<Integer, List<Temperature>> tmps = sortTempsByChannel(tems);
-					
-					List<Temperature> logs = new ArrayList<Temperature>();
-					Map<Integer, Date> maxDates = temDao.getMaxDateFromLog();
-					
-					for(Integer channel : tmps.keySet()){
-						Date maxDate = maxDates.get(channel);
-						if(maxDate != null)
-							maxDate = DateUtils.addMinutes(maxDate, logInterval);
+					Date endDate = DateUtils.addMilliseconds(new Date(), logTime);
+					List<Temperature> tems = temDao.getTemsByDateNStatus(cIds, endDate, Temperature.STATUS_ALARMED);
+					if(tems != null && tems.size() > 0){
+						// get log interval
+						Config config = configDao.getConfigs().get(Config.TYPE_BACK_INTERVAL_FLAG);
 						
-						List<Temperature> tmp = tmps.get(channel);
+						// NOTE: no back up by default!!!
+						if(config != null && config.getValue() > 0){
+							int logInterval = new Long(config.getValue()).intValue();
+							
+							// filter log data
+							Map<Integer, List<Temperature>> tmps = groupTempsByChannel(tems);
+							
+							List<Temperature> logs = new ArrayList<Temperature>();
+							Map<Integer, Date> maxDates = temDao.getMaxDateFromLog(cIds);
+							
+							for(Integer channel : tmps.keySet()){
+								Date maxDate = maxDates.get(channel);
+								if(maxDate != null)
+									maxDate = DateUtils.addMinutes(maxDate, logInterval);
+								
+								List<Temperature> tmp = tmps.get(channel);
+								
+								if(tmp != null && tmps.size() > 0)
+									for(Temperature tem : tmp)
+										if(tem != null && tem.getDate() != null && (maxDate == null || maxDate.before(tem.getDate()))){
+											logs.add(tem);
+											maxDate = DateUtils.addMinutes(tem.getDate(), logInterval);
+										} else{
+											if(alarmDao.hasAlarm(tem.getChannel(), DateUtils.addHours(tem.getDate(), -1), DateUtils.addHours(tem.getDate(), 1))){
+												logs.add(tem);
+												maxDate = DateUtils.addMinutes(tem.getDate(), logInterval);
+											}
+										}
+							}
+							
+							// insert filtered into log
+							if(logs != null && logs.size() > 0){
+								Config configStock = configDao.getConfigs().get(Config.TYPE_STOCK_FLAG);
+								boolean stock = false;
+								if(configStock != null && configStock.getValue() == Config.VALUE_SAVE)
+									stock = true;
+
+								Config configRefer= configDao.getConfigs().get(Config.TYPE_REFER_TEM_FLAG);
+								boolean refer = false;
+								if(configRefer != null && configRefer.getValue() == Config.VALUE_SAVE)
+									refer = true;
+								
+								temDao.copyTemToLog(logs, stock, refer);
+							}
+						}
 						
-						if(tmp != null && tmps.size() > 0)
-							for(Temperature tem : tmp)
-								if(tem != null && tem.getDate() != null && (maxDate == null || maxDate.before(tem.getDate()))){
-									logs.add(tem);
-									maxDate = DateUtils.addMinutes(tem.getDate(), logInterval);
-								}
+						// insert all into tmp
+						//temDao.copyTemToTmp(endDate, Temperature.STATUS_ALARMED);
+						
+						// remove from temperature
+						temDao.removeTemFromTem(endDate, Temperature.STATUS_ALARMED);
 					}
-					
-					// insert filtered into log
-					if(logs != null && logs.size() > 0)
-						temDao.copyTemToLog(logs);
 				}
-				
-				// insert all into tmp
-				temDao.copyTemToTmp(endDate, Temperature.STATUS_ALARMED);
-				
-				// remove from temperature
-				temDao.removeTemFromTem(endDate, Temperature.STATUS_ALARMED);
 			}
 		} finally {
 	    	if(logger.isInfoEnabled())
@@ -171,7 +201,7 @@ public class TemServiceImpl implements TemService {
 		}
 	}
 
-	private Map<Integer, List<Temperature>> sortTempsByChannel(List<Temperature> tems) {
+	private Map<Integer, List<Temperature>> groupTempsByChannel(List<Temperature> tems) {
 		Map<Integer, List<Temperature>> tmps = new HashMap<Integer, List<Temperature>>();
 		for(Temperature tem : tems)
 			if(tem != null){
