@@ -76,6 +76,8 @@ public class Alarm {
 	
 	private int status;
 	
+	private Date addTime;
+	
 	private int lastModUserid;
 	
 	private Date lastModTime;
@@ -245,5 +247,13 @@ public class Alarm {
 
 	public void setRelay1(String relay1) {
 		this.relay1 = relay1;
+	}
+
+	public Date getAddTime() {
+		return addTime;
+	}
+
+	public void setAddTime(Date addTime) {
+		this.addTime = addTime;
 	}
 }

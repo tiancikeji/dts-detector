@@ -1089,12 +1089,7 @@ public class TemServiceImpl implements TemService {
 			
 			// save alarms
 			if(alarms != null && alarms.size() > 0)
-				for(Alarm alarm : alarms)
-					try{
-						alarmDao.addAlarm(alarm);
-					} catch(Throwable t){
-						logger.error("Error in adding alarm >> ", t);
-					}
+				alarmDao.addAlarms(alarms);
 			
 			// update status
 			temDao.updateTemsStatus(tems, Temperature.STATUS_ALARMED);
@@ -1131,16 +1126,26 @@ public class TemServiceImpl implements TemService {
 				for(Machine machine : machines)
 					ids.add(new Long(machine.getId()));
 				
-				List<Alarm> alarms = alarmDao.getAlarms(ids, new Object[]{Alarm.STATUS_NEW, Alarm.STATUS_ALARMED, Alarm.STATUS_NOTIFY, Alarm.STATUS_MUTE, Alarm.STATUS_RESET});
+				List<Alarm> alarms = alarmDao.getAlarms(ids, new Object[]{Alarm.STATUS_ALARMED, Alarm.STATUS_NOTIFY, Alarm.STATUS_MUTE, Alarm.STATUS_MUTED, Alarm.STATUS_RESET});
 				
 				if(alarms != null && alarms.size() > 0){
-					Collections.sort(alarms, new Comparator<Alarm>(){
-						@Override
-						public int compare(Alarm a1, Alarm a2) {
-							return a1.getStatus() - a2.getStatus();
+					boolean ctrl = false;
+					
+					for(Alarm alarm : alarms)
+						if(alarm.getStatus() == Alarm.STATUS_MUTE || alarm.getStatus() == Alarm.STATUS_RESET){
+							ctrl = true;
+							break;
 						}
-					});
-					_ctrlTem(alarms, ids);
+					
+					if(ctrl){
+						Collections.sort(alarms, new Comparator<Alarm>(){
+							@Override
+							public int compare(Alarm a1, Alarm a2) {
+								return a1.getStatus() - a2.getStatus();
+							}
+						});
+						_ctrlTem(alarms, ids);
+					}
 				}
 			}
 		} finally{
@@ -1177,6 +1182,9 @@ public class TemServiceImpl implements TemService {
 				Map<Integer, AlarmProtocol> protocols = new HashMap<Integer, AlarmProtocol>();
 				String gpioState = AlarmProtocol.GPIO_STATE_OFF;
 				for(Alarm alarm : alarms){
+					if(alarm.getType() == Alarm.TYPE_FREE_SPACE)
+						continue;
+					
 					AlarmProtocol _pro = protocols.get(alarm.getAreaId());
 					if(_pro == null){
 						_pro = new AlarmProtocol();
@@ -1198,7 +1206,7 @@ public class TemServiceImpl implements TemService {
 							
 							alarm.setStatus(Alarm.STATUS_RESETED);
 					} else {
-						if(alarm.getStatus() == Alarm.STATUS_MUTE)
+						if(alarm.getStatus() == Alarm.STATUS_MUTE || alarm.getStatus() == Alarm.STATUS_MUTED)
 							_pro.setVoiceState(AlarmProtocol.VOICE_STATE_OFF);
 						
 						if(alarm.getType() == Alarm.TYPE_TEMPERATURE_LOW){

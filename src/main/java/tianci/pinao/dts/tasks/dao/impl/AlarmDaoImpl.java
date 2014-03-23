@@ -62,6 +62,42 @@ public class AlarmDaoImpl extends JdbcDaoSupport implements AlarmDao {
 	}
 
 	@Override
+	public void addAlarms(final List<Alarm> alarms) {
+		getJdbcTemplate().batchUpdate("insert into " + SqlConstants.TABLE_ALARM + "(type, machine_id, machine_name, channel_id, channel_name, length, area_id, area_name, alarm_name, light, relay, relay1, voice, temperature, temperature_pre, status, add_time, lastmod_time, lastmod_userid, isdel) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now(), ?, 0)", 
+				new BatchPreparedStatementSetter() {
+					
+					@Override
+					public void setValues(PreparedStatement ps, int i) throws SQLException {
+						if(alarms.size() > i){
+							Alarm alarm = alarms.get(i);
+							ps.setObject(1, alarm.getType());
+							ps.setObject(2, alarm.getMachineId());
+							ps.setObject(3, alarm.getMachineName());
+							ps.setObject(4, alarm.getChannelId());
+							ps.setObject(5, alarm.getChannelName());
+							ps.setObject(6, alarm.getLength());
+							ps.setObject(7, alarm.getAreaId());
+							ps.setObject(8, alarm.getAreaName());
+							ps.setObject(9, alarm.getAlarmName());
+							ps.setObject(10, alarm.getLight());
+							ps.setObject(11, alarm.getRelay());
+							ps.setObject(12, alarm.getRelay1());
+							ps.setObject(13, alarm.getVoice());
+							ps.setObject(14, alarm.getTemperatureCurr());
+							ps.setObject(15, alarm.getTemperaturePre());
+							ps.setObject(16, alarm.getStatus());
+							ps.setObject(17, alarm.getLastModUserid());
+						}
+					}
+					
+					@Override
+					public int getBatchSize() {
+						return alarms.size();
+					}
+				});
+	}
+
+	@Override
 	public void updateAlarms(final List<Alarm> alarms) {
 		getJdbcTemplate().batchUpdate("update " + SqlConstants.TABLE_ALARM + " set status = ? where id = ?", new BatchPreparedStatementSetter() {
 			
@@ -85,7 +121,7 @@ public class AlarmDaoImpl extends JdbcDaoSupport implements AlarmDao {
 
 	@Override
 	public List<Alarm> getAlarms(List<Long> ids, Object[] status) {
-		return getJdbcTemplate().query("select id, type, machine_id, machine_name, channel_id, channel_name, length, area_id, area_name, alarm_name, light, relay, relay1, voice, temperature, temperature_pre, status, add_time, lastmod_time, lastmod_userid, isdel from " + SqlConstants.TABLE_ALARM + " where isdel = ? and status in (" + StringUtils.join(status, ",") + ") and machine_id in (" + StringUtils.join(ids, ",") + ")",  
+		return getJdbcTemplate().query("select id, type, machine_id, machine_name, channel_id, channel_name, length, area_id, area_name, alarm_name, light, relay, relay1, voice, temperature, temperature_pre, status, add_time, lastmod_time, lastmod_userid, isdel from (select * from " + SqlConstants.TABLE_ALARM + " where isdel = ? and status in (" + StringUtils.join(status, ",") + ") and machine_id in (" + StringUtils.join(ids, ",") + ") order by lastmod_time desc) a group by channel_id, length",  
 				new Object[]{0}, new RowMapper<Alarm>(){
 
 					@Override

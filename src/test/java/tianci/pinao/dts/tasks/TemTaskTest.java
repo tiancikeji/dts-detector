@@ -19,7 +19,7 @@ public class TemTaskTest extends TestCase {
 	
 	public void testReadTem(){
 		if(flag){
-			TemService task = new ClassPathXmlApplicationContext("applicationContext.xml").getBean("temService", TemService.class);
+			TemService task = getTemService();
 			
 			task.readTem();
 		}
@@ -27,7 +27,7 @@ public class TemTaskTest extends TestCase {
 	
 	public void testSaveTem(){
 		if(flag){
-			TemService task = new ClassPathXmlApplicationContext("applicationContext.xml").getBean("temService", TemService.class);
+			TemService task = getTemService();
 			
 			task.saveTem();
 		}
@@ -35,7 +35,7 @@ public class TemTaskTest extends TestCase {
 	
 	public void testCheckTem(){
 		if(flag){
-			TemService task = new ClassPathXmlApplicationContext("applicationContext.xml").getBean("temService", TemService.class);
+			TemService task = getTemService();
 			
 			task.checkTem();
 		}
@@ -43,7 +43,7 @@ public class TemTaskTest extends TestCase {
 	
 	public void testAlarmTem(){
 		if(flag){
-			TemService task = new ClassPathXmlApplicationContext("applicationContext.xml").getBean("temService", TemService.class);
+			TemService task = getTemService();
 			
 			task.alarmTem();
 		}
@@ -51,9 +51,14 @@ public class TemTaskTest extends TestCase {
 	
 	public void testCtrlTem(){
 		if(flag){
-			TemService task = new ClassPathXmlApplicationContext("applicationContext.xml").getBean("temService", TemService.class);
+			TemService task = getTemService();
 			
 			task.ctrlTem();
 		}
+	}
+
+	private TemService getTemService() {
+		TemService task = new ClassPathXmlApplicationContext("applicationContext.xml").getBean("temService", TemService.class);
+		return task;
 	}
 }

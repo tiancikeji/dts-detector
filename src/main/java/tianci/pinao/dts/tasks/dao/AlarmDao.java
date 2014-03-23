@@ -11,6 +11,8 @@ public interface AlarmDao {
 
 	public void addAlarm(Alarm alarm);
 
+	public void addAlarms(List<Alarm> alarms);
+
 	public void updateAlarms(List<Alarm> alarms);
 
 	public List<Alarm> getAlarms(List<Long> ids, Object[] status);
