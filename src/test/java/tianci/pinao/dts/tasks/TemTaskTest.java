@@ -64,6 +64,20 @@ public class TemTaskTest extends TestCase {
 			task.logTem();
 		}
 	}
+	
+	public void testInitAlarm(){
+		if(flag){
+			new ClassPathXmlApplicationContext("applicationContext.xml").getBean("initAlarmTask", InitAlarmTask.class);
+		}
+	}
+	
+	public void testCheckHardware(){
+		if(true){
+			TemService task = getTemService();
+			
+			task.checkHardware();
+		}
+	}
 
 	private TemService getTemService() {
 		TemService task = new ClassPathXmlApplicationContext("applicationContext.xml").getBean("temService", TemService.class);

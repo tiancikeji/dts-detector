@@ -17,6 +17,7 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 
 import tianci.pinao.dts.models.Alarm;
+import tianci.pinao.dts.models.Check;
 import tianci.pinao.dts.tasks.dao.AlarmDao;
 import tianci.pinao.dts.util.SqlConstants;
 
@@ -35,7 +36,7 @@ public class AlarmDaoImpl extends JdbcDaoSupport implements AlarmDao {
 			
 			@Override
 			public PreparedStatement createPreparedStatement(Connection con) throws SQLException {
-				PreparedStatement ps = con.prepareStatement("insert into " + SqlConstants.TABLE_ALARM + "(type, machine_id, machine_name, channel_id, channel_name, length, area_id, area_name, alarm_name, light, relay, relay1, voice, temperature, temperature_pre, status, add_time, lastmod_time, lastmod_userid, isdel) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now(), ?, 0)", Statement.RETURN_GENERATED_KEYS);
+				PreparedStatement ps = con.prepareStatement("insert into " + SqlConstants.TABLE_ALARM + "(type, machine_id, machine_name, channel_id, channel_name, length, area_id, area_name, alarm_name, light, relay, relay1, voice, temperature, temperature_pre, temperature_max, status, add_time, lastmod_time, lastmod_userid, isdel) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now(), ?, 0)", Statement.RETURN_GENERATED_KEYS);
 				ps.setObject(1, alarm.getType());
 				ps.setObject(2, alarm.getMachineId());
 				ps.setObject(3, alarm.getMachineName());
@@ -51,8 +52,9 @@ public class AlarmDaoImpl extends JdbcDaoSupport implements AlarmDao {
 				ps.setObject(13, alarm.getVoice());
 				ps.setObject(14, alarm.getTemperatureCurr());
 				ps.setObject(15, alarm.getTemperaturePre());
-				ps.setObject(16, alarm.getStatus());
-				ps.setObject(17, alarm.getLastModUserid());
+				ps.setObject(16, alarm.getTemperatureMax());
+				ps.setObject(17, alarm.getStatus());
+				ps.setObject(18, alarm.getLastModUserid());
 				return ps;
 			}
 		}, holder);
@@ -63,7 +65,7 @@ public class AlarmDaoImpl extends JdbcDaoSupport implements AlarmDao {
 
 	@Override
 	public void addAlarms(final List<Alarm> alarms) {
-		getJdbcTemplate().batchUpdate("insert into " + SqlConstants.TABLE_ALARM + "(type, machine_id, machine_name, channel_id, channel_name, length, area_id, area_name, alarm_name, light, relay, relay1, voice, temperature, temperature_pre, status, add_time, lastmod_time, lastmod_userid, isdel) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now(), ?, 0)", 
+		getJdbcTemplate().batchUpdate("insert into " + SqlConstants.TABLE_ALARM + "(type, machine_id, machine_name, channel_id, channel_name, length, area_id, area_name, alarm_name, light, relay, relay1, voice, temperature, temperature_pre, temperature_max, status, add_time, lastmod_time, lastmod_userid, isdel) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now(), ?, 0)", 
 				new BatchPreparedStatementSetter() {
 					
 					@Override
@@ -85,8 +87,9 @@ public class AlarmDaoImpl extends JdbcDaoSupport implements AlarmDao {
 							ps.setObject(13, alarm.getVoice());
 							ps.setObject(14, alarm.getTemperatureCurr());
 							ps.setObject(15, alarm.getTemperaturePre());
-							ps.setObject(16, alarm.getStatus());
-							ps.setObject(17, alarm.getLastModUserid());
+							ps.setObject(16, alarm.getTemperatureMax());
+							ps.setObject(17, alarm.getStatus());
+							ps.setObject(18, alarm.getLastModUserid());
 						}
 					}
 					
@@ -121,7 +124,7 @@ public class AlarmDaoImpl extends JdbcDaoSupport implements AlarmDao {
 
 	@Override
 	public List<Alarm> getAlarms(List<Long> ids, Object[] status) {
-		return getJdbcTemplate().query("select id, type, machine_id, machine_name, channel_id, channel_name, length, area_id, area_name, alarm_name, light, relay, relay1, voice, temperature, temperature_pre, status, add_time, lastmod_time, lastmod_userid, isdel from (select * from " + SqlConstants.TABLE_ALARM + " where isdel = ? and status in (" + StringUtils.join(status, ",") + ") and machine_id in (" + StringUtils.join(ids, ",") + ") order by lastmod_time desc) a group by channel_id, length",  
+		return getJdbcTemplate().query("select id, type, machine_id, machine_name, channel_id, channel_name, length, area_id, area_name, alarm_name, light, relay, relay1, voice, temperature, temperature_pre, temperature_max, status, add_time, lastmod_time, lastmod_userid, isdel from (select * from " + SqlConstants.TABLE_ALARM + " where isdel = ? and status in (" + StringUtils.join(status, ",") + ") and machine_id in (" + StringUtils.join(ids, ",") + ") order by lastmod_time desc) a group by channel_id, length",  
 				new Object[]{0}, new RowMapper<Alarm>(){
 
 					@Override
@@ -144,6 +147,7 @@ public class AlarmDaoImpl extends JdbcDaoSupport implements AlarmDao {
 						alarm.setVoice(rs.getString("voice"));
 						alarm.setTemperatureCurr(rs.getDouble("temperature"));
 						alarm.setTemperaturePre(rs.getDouble("temperature_pre"));
+						alarm.setTemperatureMax(rs.getDouble("temperature_max"));
 						alarm.setStatus(rs.getInt("status"));
 						
 						return alarm;
@@ -157,6 +161,52 @@ public class AlarmDaoImpl extends JdbcDaoSupport implements AlarmDao {
 		int count = getJdbcTemplate().queryForInt("select count(1) from " + SqlConstants.TABLE_ALARM + " where channel_id = ? and add_time between ? and ?",
 				new Object[]{channel, start, end}); 
 		return count > 0;
+	}
+
+	@Override
+	public List<Check> getChecks(int id, int status) {
+		return getJdbcTemplate().query("select id, machine_id, channel_id, area_id, light, relay, relay1, voice, status from " + SqlConstants.TABLE_CHECK + " where isdel = ? and status = ? and machine_id = ?", 
+				new Object[]{0, status, id}, new RowMapper<Check>() {
+
+			@Override
+			public Check mapRow(ResultSet rs, int rowNum) throws SQLException {
+				Check check = new Check();
+				
+				check.setId(rs.getLong("id"));
+				check.setMachineId(rs.getInt("machine_id"));
+				check.setChannelId(rs.getInt("channel_id"));
+				check.setAreaId(rs.getInt("area_id"));
+				check.setLight(rs.getString("light"));
+				check.setRelay(rs.getString("relay"));
+				check.setRelay1(rs.getString("relay1"));
+				check.setVoice(rs.getString("voice"));
+				check.setStatus(rs.getInt("status"));
+				
+				return check;
+			}
+		});
+	}
+
+	@Override
+	public void updateChecks(final List<Check> checks, final int status) {
+		getJdbcTemplate().batchUpdate("update " + SqlConstants.TABLE_CHECK + " set status = ? where id = ?", new BatchPreparedStatementSetter() {
+			
+			@Override
+			public void setValues(PreparedStatement ps, int index) throws SQLException {
+				if(checks.size() > index){
+					Check check = checks.get(index);
+					if(check != null){
+						ps.setObject(1, status);
+						ps.setObject(2, check.getId());
+					}
+				}
+			}
+			
+			@Override
+			public int getBatchSize() {
+				return checks.size();
+			}
+		});
 	}
 
 }

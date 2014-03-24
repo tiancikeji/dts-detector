@@ -32,9 +32,11 @@ import tianci.pinao.dts.models.AreaChannel;
 import tianci.pinao.dts.models.AreaHardwareConfig;
 import tianci.pinao.dts.models.AreaTempConfig;
 import tianci.pinao.dts.models.Channel;
+import tianci.pinao.dts.models.Check;
 import tianci.pinao.dts.models.Config;
 import tianci.pinao.dts.models.Machine;
 import tianci.pinao.dts.models.Temperature;
+import tianci.pinao.dts.sal.TemAlarm;
 import tianci.pinao.dts.sal.TemMonitor;
 import tianci.pinao.dts.services.TemService;
 import tianci.pinao.dts.tasks.dao.AlarmDao;
@@ -76,6 +78,86 @@ public class TemServiceImpl implements TemService {
 		
     	if(!(dir.exists() && dir.isDirectory()))
     		dir.mkdirs();
+	}
+
+	@Override
+	public void checkHardware() {
+		if(logger.isInfoEnabled())
+			logger.info("Starting check hardware");
+		long start = System.currentTimeMillis();
+		
+		try{
+			List<Machine> machines = areaDao.getMachineByName(machineId);
+			if(machines != null && machines.size() > 0)
+				for(Machine machine : machines){
+					List<Check> checks = alarmDao.getChecks(machine.getId(), Check.STATUS_NEW);
+					
+					if(checks != null && checks.size() > 0)
+						_checkHardware(checks, machine);
+				}
+		} finally{
+			if(logger.isInfoEnabled())
+				logger.info("End check Hardware used <" + (System.currentTimeMillis() - start) + ">");
+		}
+	}
+
+	private void _checkHardware(List<Check> checks, Machine machine) {
+		try{
+			List<Integer> states = new ArrayList<Integer>();
+			
+			for(Check check : checks){
+				states.add(NumberUtils.toInt(check.getLight()));
+				states.add(AlarmProtocol.LIGHT_STATE_GLITCH_FIRE);
+				states.add(NumberUtils.toInt(check.getRelay()));
+				states.add(AlarmProtocol.RELAY_STATE_ON);
+				states.add(NumberUtils.toInt(check.getRelay1()));
+				states.add(AlarmProtocol.RELAY_STATE_ON);
+				states.add(NumberUtils.toInt(check.getVoice()));
+				states.add(AlarmProtocol.VOICE_STATE_GLITCH_FIRE);
+			}
+			
+			states.add(0);
+			
+			// call DLL
+			callAlarm(states, machine);
+			
+			states = new ArrayList<Integer>();
+			
+			for(Check check : checks){
+				states.add(NumberUtils.toInt(check.getLight()));
+				states.add(AlarmProtocol.LIGHT_STATE_OFF);
+				states.add(NumberUtils.toInt(check.getRelay()));
+				states.add(AlarmProtocol.RELAY_STATE_OFF);
+				states.add(NumberUtils.toInt(check.getRelay1()));
+				states.add(AlarmProtocol.RELAY_STATE_OFF);
+				states.add(NumberUtils.toInt(check.getVoice()));
+				states.add(AlarmProtocol.VOICE_STATE_OFF);
+			}
+			
+			states.add(0);
+			
+			// call DLL
+			callAlarm(states, machine);
+		} finally{
+			// restore states
+			List<Long> ids = new ArrayList<Long>();
+			ids.add(new Long(machine.getId()));
+			
+			List<Alarm> alarms = alarmDao.getAlarms(ids, new Object[]{Alarm.STATUS_ALARMED, Alarm.STATUS_NOTIFY, Alarm.STATUS_MUTE, Alarm.STATUS_MUTED, Alarm.STATUS_RESET});
+			
+			if(alarms != null && alarms.size() > 0){
+				Collections.sort(alarms, new Comparator<Alarm>(){
+					@Override
+					public int compare(Alarm a1, Alarm a2) {
+						return a1.getStatus() - a2.getStatus();
+					}
+				});
+				_ctrlTem(alarms, machine, ids);
+			}
+			
+			// update status
+			alarmDao.updateChecks(checks, Check.STATUS_CHECK);
+		}
 	}
 
 	@Override
@@ -497,6 +579,7 @@ public class TemServiceImpl implements TemService {
 		boolean result = false;
 		try{
 			System.loadLibrary("TemMonitor");
+			System.loadLibrary("Alarm");
 			result = true;
 		} finally{
 			if(logger.isInfoEnabled())
@@ -564,6 +647,7 @@ public class TemServiceImpl implements TemService {
 			Config configUnstock = configDao.getConfigs().get(Config.TYPE_UNSTOCK_THRELHOLD);
 			
 			List<Alarm> alarms = new ArrayList<Alarm>();
+			double max = 0;
 			// check as can as possible
 			for(Temperature tem : tems)
 				try{
@@ -630,6 +714,9 @@ public class TemServiceImpl implements TemService {
 								AreaTempConfig tempConfig = aTemps.get(_channel.getAreaid());
 								AreaHardwareConfig hardWareConfig = aHards.get(_channel.getAreaid());
 								Double _tem = NumberUtils.toDouble(_tems[i], -1);
+								
+								if(_tem > max)
+									max = _tem;
 								
 								// firstly check error
 								boolean glitch = false;
@@ -1118,12 +1205,71 @@ public class TemServiceImpl implements TemService {
 			}
 			
 			// save alarms
-			if(alarms != null && alarms.size() > 0)
+			if(alarms != null && alarms.size() > 0){
+				for(Alarm alarm : alarms)
+					alarm.setTemperatureMax(max);
 				alarmDao.addAlarms(alarms);
+			}
 			
 			// update status
 			temDao.updateTemsStatus(tems, Temperature.STATUS_ALARMED);
 		}
+	}
+
+	public void initAlarm(){
+		if(logger.isInfoEnabled())
+			logger.info("Starting init alarm");
+		long start = System.currentTimeMillis();
+		
+		try{
+			List<Machine> machines = areaDao.getMachineByName(machineId);
+			if(machines != null && machines.size() > 0)
+				for(Machine machine : machines)
+					_initAlarm(machine);
+		} finally{
+			if(logger.isInfoEnabled())
+				logger.info("End init alarm used <" + (System.currentTimeMillis() - start) + ">");
+		}
+	}
+
+	private void _initAlarm(Machine machine) {
+		List<Long> ids = new ArrayList<Long>();
+		ids.add(new Long(machine.getId()));
+		
+		Set<Integer> cIds = new HashSet<Integer>();
+		List<Channel> channels = areaDao.getAllChannelsByMachineIds(ids);
+		if(channels != null && channels.size() > 0){
+			for(Channel channel : channels)
+				cIds.add(channel.getId());
+		}
+		
+		// area channels
+		Map<Integer, List<AreaChannel>> aChannels = areaDao.getAChannelsByIds(cIds);
+		Set<Integer> aIds = new HashSet<Integer>();
+		if(aChannels != null && aChannels.size() > 0)
+			for(Integer cId : aChannels.keySet())
+				for(AreaChannel ac : aChannels.get(cId))
+					aIds.add(ac.getAreaid());
+		
+		// area hardware configs
+		Map<Integer, AreaHardwareConfig> aHards = areaDao.getAHardsByIds(aIds);
+
+		List<Integer> states = new ArrayList<Integer>();
+		for(AreaHardwareConfig config : aHards.values()){
+			states.add(NumberUtils.toInt(config.getLight()));
+			states.add(AlarmProtocol.LIGHT_STATE_OK);
+			states.add(NumberUtils.toInt(config.getRelay()));
+			states.add(AlarmProtocol.RELAY_STATE_OFF);
+			states.add(NumberUtils.toInt(config.getRelay1()));
+			states.add(AlarmProtocol.RELAY_STATE_OFF);
+			states.add(NumberUtils.toInt(config.getVoice()));
+			states.add(AlarmProtocol.VOICE_STATE_OFF);
+		}
+		
+		states.add(0);
+		
+		// call DLL
+		callAlarm(states, machine);
 	}
 
 	private boolean checkHighGlitch(Config config, double tem) {
@@ -1151,33 +1297,33 @@ public class TemServiceImpl implements TemService {
 		
 		try{
 			List<Machine> machines = areaDao.getMachineByName(machineId);
-			if(machines != null && machines.size() > 0){
-				List<Long> ids = new ArrayList<Long>();
-				for(Machine machine : machines)
+			if(machines != null && machines.size() > 0)
+				for(Machine machine : machines){
+					List<Long> ids = new ArrayList<Long>();
 					ids.add(new Long(machine.getId()));
-				
-				List<Alarm> alarms = alarmDao.getAlarms(ids, new Object[]{Alarm.STATUS_ALARMED, Alarm.STATUS_NOTIFY, Alarm.STATUS_MUTE, Alarm.STATUS_MUTED, Alarm.STATUS_RESET});
-				
-				if(alarms != null && alarms.size() > 0){
-					boolean ctrl = false;
 					
-					for(Alarm alarm : alarms)
-						if(alarm.getStatus() == Alarm.STATUS_MUTE || alarm.getStatus() == Alarm.STATUS_RESET){
-							ctrl = true;
-							break;
-						}
+					List<Alarm> alarms = alarmDao.getAlarms(ids, new Object[]{Alarm.STATUS_ALARMED, Alarm.STATUS_NOTIFY, Alarm.STATUS_MUTE, Alarm.STATUS_MUTED, Alarm.STATUS_RESET});
 					
-					if(ctrl){
-						Collections.sort(alarms, new Comparator<Alarm>(){
-							@Override
-							public int compare(Alarm a1, Alarm a2) {
-								return a1.getStatus() - a2.getStatus();
+					if(alarms != null && alarms.size() > 0){
+						boolean ctrl = false;
+						
+						for(Alarm alarm : alarms)
+							if(alarm.getStatus() == Alarm.STATUS_MUTE || alarm.getStatus() == Alarm.STATUS_RESET){
+								ctrl = true;
+								break;
 							}
-						});
-						_ctrlTem(alarms, ids);
+						
+						if(ctrl){
+							Collections.sort(alarms, new Comparator<Alarm>(){
+								@Override
+								public int compare(Alarm a1, Alarm a2) {
+									return a1.getStatus() - a2.getStatus();
+								}
+							});
+							_ctrlTem(alarms, machine, ids);
+						}
 					}
 				}
-			}
 		} finally{
 			if(logger.isInfoEnabled())
 				logger.info("End ctrl tem used <" + (System.currentTimeMillis() - start) + ">");
@@ -1185,17 +1331,14 @@ public class TemServiceImpl implements TemService {
 	}
 
 	// send alarm DLL
-	private void _ctrlTem(List<Alarm> alarms, List<Long> mIds) {
+	private void _ctrlTem(List<Alarm> alarms, Machine machine, List<Long> ids) {
 		if(alarms != null && alarms.size() > 0)
 			try{
-				List<Machine> machines = areaDao.getMachineByName(machineId);
 				Set<Integer> cIds = new HashSet<Integer>();
-				if(machines != null && machines.size() > 0){
-					List<Channel> channels = areaDao.getAllChannelsByMachineIds(mIds);
-					if(channels != null && channels.size() > 0){
-						for(Channel channel : channels)
-							cIds.add(channel.getId());
-					}
+				List<Channel> channels = areaDao.getAllChannelsByMachineIds(ids);
+				if(channels != null && channels.size() > 0){
+					for(Channel channel : channels)
+						cIds.add(channel.getId());
 				}
 				
 				// area channels
@@ -1209,50 +1352,49 @@ public class TemServiceImpl implements TemService {
 				// area hardware configs
 				Map<Integer, AreaHardwareConfig> aHards = areaDao.getAHardsByIds(aIds);
 				
-				Map<Integer, AlarmProtocol> protocols = new HashMap<Integer, AlarmProtocol>();
-				String gpioState = AlarmProtocol.GPIO_STATE_OFF;
+				boolean reset = false;
+				double max = 0;
 				for(Alarm alarm : alarms){
-					if(alarm.getType() == Alarm.TYPE_FREE_SPACE)
-						continue;
-					
-					AlarmProtocol _pro = protocols.get(alarm.getAreaId());
-					if(_pro == null){
-						_pro = new AlarmProtocol();
-						_pro.setRelay(alarm.getRelay());
-						_pro.setRelay1(alarm.getRelay1());
-						_pro.setLight(alarm.getLight());
-						_pro.setVoice(alarm.getVoice());
-						_pro.setVoiceState(AlarmProtocol.VOICE_STATE_ON);
-						
-						protocols.put(alarm.getAreaId(), _pro);
-						aHards.remove(alarm.getAreaId());
+					if(alarm.getTemperatureMax() > max)
+						max = alarm.getTemperatureMax();
+					if(alarm.getStatus() == Alarm.STATUS_RESET){
+						reset = true;
 					}
-					
-					 if(alarm.getStatus() == Alarm.STATUS_RESET){
-							_pro.setLightState(AlarmProtocol.LIGHT_STATE_RESET);
-							_pro.setRelayState(AlarmProtocol.RELAY_STATE_OFF);
-							_pro.setRelay1State(AlarmProtocol.RELAY_STATE_OFF);
-							_pro.setVoiceState(AlarmProtocol.VOICE_STATE_OFF);
+				}
+				List<Integer> states = new ArrayList<Integer>();
+				
+				if(!reset){
+					Map<Integer, AlarmProtocol> protocols = new HashMap<Integer, AlarmProtocol>();
+					for(Alarm alarm : alarms){
+						if(alarm.getType() == Alarm.TYPE_FREE_SPACE)
+							continue;
+						
+						AlarmProtocol _pro = protocols.get(alarm.getAreaId());
+						if(_pro == null){
+							_pro = new AlarmProtocol();
+							_pro.setRelay(alarm.getRelay());
+							_pro.setRelay1(alarm.getRelay1());
+							_pro.setLight(alarm.getLight());
+							_pro.setVoice(alarm.getVoice());
 							
-							alarm.setStatus(Alarm.STATUS_RESETED);
-					} else {
-						if(alarm.getStatus() == Alarm.STATUS_MUTE || alarm.getStatus() == Alarm.STATUS_MUTED)
-							_pro.setVoiceState(AlarmProtocol.VOICE_STATE_OFF);
+							protocols.put(alarm.getAreaId(), _pro);
+							aHards.remove(alarm.getAreaId());
+						}
 						
 						if(alarm.getType() == Alarm.TYPE_TEMPERATURE_LOW){
 							_pro.setRelay1State(AlarmProtocol.RELAY_STATE_ON);
 							
-							if(StringUtils.equals(_pro.getLightState(), AlarmProtocol.LIGHT_STATE_GLITCH)
-									|| StringUtils.equals(_pro.getLightState(), AlarmProtocol.LIGHT_STATE_GLITCH_FIRE))
+							if(_pro.getLightState() == AlarmProtocol.LIGHT_STATE_GLITCH
+									|| _pro.getLightState() == AlarmProtocol.LIGHT_STATE_GLITCH_FIRE)
 								_pro.setLightState(AlarmProtocol.LIGHT_STATE_GLITCH_FIRE);
 							else
 								_pro.setLightState(AlarmProtocol.LIGHT_STATE_FIRE);
 							
-							if(StringUtils.equals(gpioState, AlarmProtocol.GPIO_STATE_GLITCH)
-									|| StringUtils.equals(_pro.getLightState(), AlarmProtocol.GPIO_STATE_ON))
-								gpioState = AlarmProtocol.GPIO_STATE_ON;
+							if(_pro.getVoiceState() == AlarmProtocol.VOICE_STATE_GLITCH
+									|| _pro.getVoiceState() == AlarmProtocol.VOICE_STATE_GLITCH_FIRE)
+								_pro.setVoiceState(AlarmProtocol.VOICE_STATE_GLITCH_FIRE);
 							else
-								gpioState = AlarmProtocol.GPIO_STATE_FIRE;
+								_pro.setVoiceState(AlarmProtocol.VOICE_STATE_FIRE);
 						}
 						
 						if(alarm.getType() == Alarm.TYPE_TEMPERATURE_HIGH
@@ -1260,18 +1402,17 @@ public class TemServiceImpl implements TemService {
 								|| alarm.getType() == Alarm.TYPE_TEMPERATURE_DIFF){
 							_pro.setRelayState(AlarmProtocol.RELAY_STATE_ON);
 							
-							_pro.setLight(alarm.getLight());
-							if(StringUtils.equals(_pro.getLightState(), AlarmProtocol.LIGHT_STATE_GLITCH)
-									|| StringUtils.equals(_pro.getLightState(), AlarmProtocol.LIGHT_STATE_GLITCH_FIRE))
+							if(_pro.getLightState() == AlarmProtocol.LIGHT_STATE_GLITCH
+									|| _pro.getLightState() == AlarmProtocol.LIGHT_STATE_GLITCH_FIRE)
 								_pro.setLightState(AlarmProtocol.LIGHT_STATE_GLITCH_FIRE);
 							else
 								_pro.setLightState(AlarmProtocol.LIGHT_STATE_FIRE);
 							
-							if(StringUtils.equals(gpioState, AlarmProtocol.GPIO_STATE_GLITCH)
-									|| StringUtils.equals(_pro.getLightState(), AlarmProtocol.GPIO_STATE_ON))
-								gpioState = AlarmProtocol.GPIO_STATE_ON;
+							if(_pro.getVoiceState() == AlarmProtocol.VOICE_STATE_GLITCH
+									|| _pro.getVoiceState() == AlarmProtocol.VOICE_STATE_GLITCH_FIRE)
+								_pro.setVoiceState(AlarmProtocol.VOICE_STATE_GLITCH_FIRE);
 							else
-								gpioState = AlarmProtocol.GPIO_STATE_FIRE;
+								_pro.setVoiceState(AlarmProtocol.VOICE_STATE_FIRE);
 						}
 						
 						if(alarm.getType() == Alarm.TYPE_TEMPERATURE_EXTREME_HIGH
@@ -1280,54 +1421,54 @@ public class TemServiceImpl implements TemService {
 								|| alarm.getType() == Alarm.TYPE_UNSTOCK_LOW){
 							_pro.setRelayState(AlarmProtocol.RELAY_STATE_ON);
 							
-							_pro.setLight(alarm.getLight());
-							if(StringUtils.equals(_pro.getLightState(), AlarmProtocol.LIGHT_STATE_FIRE)
-									|| StringUtils.equals(_pro.getLightState(), AlarmProtocol.LIGHT_STATE_GLITCH_FIRE))
+							if(_pro.getLightState() == AlarmProtocol.LIGHT_STATE_GLITCH
+									|| _pro.getLightState() == AlarmProtocol.LIGHT_STATE_GLITCH_FIRE)
 								_pro.setLightState(AlarmProtocol.LIGHT_STATE_GLITCH_FIRE);
-							else 
+							else
 								_pro.setLightState(AlarmProtocol.LIGHT_STATE_GLITCH);
 							
-							if(StringUtils.equals(gpioState, AlarmProtocol.GPIO_STATE_FIRE)
-									|| StringUtils.equals(_pro.getLightState(), AlarmProtocol.GPIO_STATE_ON))
-								gpioState = AlarmProtocol.GPIO_STATE_ON;
+							if(_pro.getVoiceState() == AlarmProtocol.VOICE_STATE_GLITCH
+									|| _pro.getVoiceState() == AlarmProtocol.VOICE_STATE_GLITCH_FIRE)
+								_pro.setVoiceState(AlarmProtocol.VOICE_STATE_GLITCH_FIRE);
 							else
-								gpioState = AlarmProtocol.GPIO_STATE_GLITCH;
+								_pro.setVoiceState(AlarmProtocol.VOICE_STATE_GLITCH);
 						}
-					
-						alarm.setStatus(Alarm.STATUS_MUTED);
+						
+						if(alarm.getStatus() == Alarm.STATUS_MUTE || alarm.getStatus() == Alarm.STATUS_MUTED){
+							_pro.setVoiceState(AlarmProtocol.VOICE_STATE_OFF);
+							alarm.setStatus(Alarm.STATUS_MUTED);
+						}
 					}
-				}
+					
+					for(AlarmProtocol pro : protocols.values()){
+						states.add(NumberUtils.toInt(pro.getLight()));
+						states.add(pro.getLightState());
+						states.add(NumberUtils.toInt(pro.getRelay()));
+						states.add(pro.getRelayState());
+						states.add(NumberUtils.toInt(pro.getRelay1()));
+						states.add(pro.getRelay1State());
+						states.add(NumberUtils.toInt(pro.getVoice()));
+						states.add(pro.getVoiceState());
+					}
+				} else
+					for(Alarm alarm : alarms)
+						alarm.setStatus(Alarm.STATUS_RESETED);
 				
-				StringBuilder sb = new StringBuilder(AlarmProtocol.HEADER);
-				sb.append(AlarmProtocol.ADDRESS_EXTENSION);
-				
-				for(AlarmProtocol pro : protocols.values()){
-					sb.append(pro.getLight());
-					sb.append(pro.getLightState());
-					sb.append(pro.getRelay());
-					sb.append(pro.getRelayState());
-					sb.append(pro.getRelay1());
-					sb.append(pro.getRelay1State());
-					sb.append(pro.getVoice());
-					sb.append(pro.getVoiceState());
-				}
 				for(AreaHardwareConfig config : aHards.values()){
-					sb.append(config.getLight());
-					sb.append(AlarmProtocol.LIGHT_STATE_NORMAL);
-					sb.append(config.getRelay());
-					sb.append(AlarmProtocol.RELAY_STATE_OFF);
-					sb.append(config.getRelay1());
-					sb.append(AlarmProtocol.RELAY_STATE_OFF);
-					sb.append(config.getVoice());
-					sb.append(AlarmProtocol.VOICE_STATE_OFF);
+					states.add(NumberUtils.toInt(config.getLight()));
+					states.add(AlarmProtocol.LIGHT_STATE_OK);
+					states.add(NumberUtils.toInt(config.getRelay()));
+					states.add(AlarmProtocol.RELAY_STATE_OFF);
+					states.add(NumberUtils.toInt(config.getRelay1()));
+					states.add(AlarmProtocol.RELAY_STATE_OFF);
+					states.add(NumberUtils.toInt(config.getVoice()));
+					states.add(AlarmProtocol.VOICE_STATE_OFF);
 				}
 				
-				sb.append(AlarmProtocol.ADDRESS_GPIO);
-				sb.append(gpioState);
-				sb.append(AlarmProtocol.TAILER);
+				states.add(new Double(max).intValue());
 				
-				// TODO call DLL
-				System.out.println(sb.toString());
+				// call DLL
+				callAlarm(states, machine);
 				
 				// update alarms
 				alarmDao.updateAlarms(alarms);
@@ -1336,6 +1477,49 @@ public class TemServiceImpl implements TemService {
 			}
 	}
 	
+	private void callAlarm(List<Integer> states, Machine machine) {
+		// init dll
+		TemAlarm alarm = null;
+		long start = System.currentTimeMillis();
+		boolean result = false;
+		try{
+			alarm = new TemAlarm();
+			result = alarm.InitPort(NumberUtils.toInt(machine.getSerialPort()), NumberUtils.toInt(machine.getBaudRate()));
+		} finally{
+			if(logger.isInfoEnabled())
+				logger.info("[DTS-ALARM-DLL]InitPort for machine.id <" + machine.getId() + "> used <" + (System.currentTimeMillis() - start) + "> result <" + result + ">");
+		}
+		
+		// send data
+		start = System.currentTimeMillis();
+		result = false;
+		try{
+			if(alarm != null){
+				int[] _states = new int[states.size()];
+				for(int i = 0; i < states.size(); i ++)
+					_states[i] = states.get(i);
+				
+				result = alarm.SendData(0, _states, states.size());
+			}
+		} finally{
+			if(logger.isInfoEnabled())
+				logger.info("[DTS-ALARM-DLL]SendData for machine.id <" + machine.getId() + "> used <" + (System.currentTimeMillis() - start) + "> result <" + result + ">");
+		}
+		
+		// close dll
+		start = System.currentTimeMillis();
+		result = false;
+		try{
+			if(alarm != null){
+				alarm.ClosePort();
+				result = true;
+			}
+		} finally{
+			if(logger.isInfoEnabled())
+				logger.info("[DTS-ALARM-DLL]ClosePort for machine.id <" + machine.getId() + "> used <" + (System.currentTimeMillis() - start) + "> result <" + result + ">");
+		}
+	}
+
 	@Override
 	public void alarmTem() {
 		if(logger.isInfoEnabled())
@@ -1344,16 +1528,16 @@ public class TemServiceImpl implements TemService {
 		
 		try{
 			List<Machine> machines = areaDao.getMachineByName(machineId);
-			if(machines != null && machines.size() > 0){
-				List<Long> ids = new ArrayList<Long>();
-				for(Machine machine : machines)
+			if(machines != null && machines.size() > 0)
+				for(Machine machine : machines){
+					List<Long> ids = new ArrayList<Long>();
 					ids.add(new Long(machine.getId()));
-				
-				List<Alarm> alarms = alarmDao.getAlarms(ids, new Object[]{Alarm.STATUS_NEW});
-				
-				if(alarms != null && alarms.size() > 0)
-					_alarmTem(alarms);
-			}
+					
+					List<Alarm> alarms = alarmDao.getAlarms(ids, new Object[]{Alarm.STATUS_NEW});
+					
+					if(alarms != null && alarms.size() > 0)
+						_alarmTem(alarms, machine, ids);
+				}
 		} finally{
 			if(logger.isInfoEnabled())
 				logger.info("End alarm tem used <" + (System.currentTimeMillis() - start) + ">");
@@ -1361,7 +1545,7 @@ public class TemServiceImpl implements TemService {
 	}
 
 	// send alarm DLL
-	private void _alarmTem(List<Alarm> alarms) {
+	private void _alarmTem(List<Alarm> alarms, Machine machine, List<Long> ids) {
 		if(alarms != null && alarms.size() > 0)
 			try{
 				// channel ids
@@ -1380,9 +1564,11 @@ public class TemServiceImpl implements TemService {
 				// area hardware configs
 				Map<Integer, AreaHardwareConfig> aHards = areaDao.getAHardsByIds(aIds);
 				
+				double max = 0;
 				Map<Integer, AlarmProtocol> protocols = new HashMap<Integer, AlarmProtocol>();
-				String gpioState = AlarmProtocol.GPIO_STATE_OFF;
 				for(Alarm alarm : alarms){
+					if(alarm.getTemperatureMax() > max)
+						max = alarm.getTemperatureMax();
 					AlarmProtocol _pro = protocols.get(alarm.getAreaId());
 					if(_pro == null){
 						_pro = new AlarmProtocol();
@@ -1390,7 +1576,6 @@ public class TemServiceImpl implements TemService {
 						_pro.setRelay1(alarm.getRelay1());
 						_pro.setLight(alarm.getLight());
 						_pro.setVoice(alarm.getVoice());
-						_pro.setVoiceState(AlarmProtocol.VOICE_STATE_ON);
 						
 						protocols.put(alarm.getAreaId(), _pro);
 						aHards.remove(alarm.getAreaId());
@@ -1399,17 +1584,17 @@ public class TemServiceImpl implements TemService {
 					if(alarm.getType() == Alarm.TYPE_TEMPERATURE_LOW){
 						_pro.setRelay1State(AlarmProtocol.RELAY_STATE_ON);
 						
-						if(StringUtils.equals(_pro.getLightState(), AlarmProtocol.LIGHT_STATE_GLITCH)
-								|| StringUtils.equals(_pro.getLightState(), AlarmProtocol.LIGHT_STATE_GLITCH_FIRE))
+						if(_pro.getLightState() == AlarmProtocol.LIGHT_STATE_GLITCH
+								|| _pro.getLightState() == AlarmProtocol.LIGHT_STATE_GLITCH_FIRE)
 							_pro.setLightState(AlarmProtocol.LIGHT_STATE_GLITCH_FIRE);
 						else
 							_pro.setLightState(AlarmProtocol.LIGHT_STATE_FIRE);
 						
-						if(StringUtils.equals(gpioState, AlarmProtocol.GPIO_STATE_GLITCH)
-								|| StringUtils.equals(_pro.getLightState(), AlarmProtocol.GPIO_STATE_ON))
-							gpioState = AlarmProtocol.GPIO_STATE_ON;
+						if(_pro.getVoiceState() == AlarmProtocol.VOICE_STATE_GLITCH
+								|| _pro.getVoiceState() == AlarmProtocol.VOICE_STATE_GLITCH_FIRE)
+							_pro.setVoiceState(AlarmProtocol.VOICE_STATE_GLITCH_FIRE);
 						else
-							gpioState = AlarmProtocol.GPIO_STATE_FIRE;
+							_pro.setVoiceState(AlarmProtocol.VOICE_STATE_FIRE);
 					}
 					
 					if(alarm.getType() == Alarm.TYPE_TEMPERATURE_HIGH
@@ -1417,18 +1602,17 @@ public class TemServiceImpl implements TemService {
 							|| alarm.getType() == Alarm.TYPE_TEMPERATURE_DIFF){
 						_pro.setRelayState(AlarmProtocol.RELAY_STATE_ON);
 						
-						_pro.setLight(alarm.getLight());
-						if(StringUtils.equals(_pro.getLightState(), AlarmProtocol.LIGHT_STATE_GLITCH)
-								|| StringUtils.equals(_pro.getLightState(), AlarmProtocol.LIGHT_STATE_GLITCH_FIRE))
+						if(_pro.getLightState() == AlarmProtocol.LIGHT_STATE_GLITCH
+								|| _pro.getLightState() == AlarmProtocol.LIGHT_STATE_GLITCH_FIRE)
 							_pro.setLightState(AlarmProtocol.LIGHT_STATE_GLITCH_FIRE);
 						else
 							_pro.setLightState(AlarmProtocol.LIGHT_STATE_FIRE);
 						
-						if(StringUtils.equals(gpioState, AlarmProtocol.GPIO_STATE_GLITCH)
-								|| StringUtils.equals(_pro.getLightState(), AlarmProtocol.GPIO_STATE_ON))
-							gpioState = AlarmProtocol.GPIO_STATE_ON;
+						if(_pro.getVoiceState() == AlarmProtocol.VOICE_STATE_GLITCH
+								|| _pro.getVoiceState() == AlarmProtocol.VOICE_STATE_GLITCH_FIRE)
+							_pro.setVoiceState(AlarmProtocol.VOICE_STATE_GLITCH_FIRE);
 						else
-							gpioState = AlarmProtocol.GPIO_STATE_FIRE;
+							_pro.setVoiceState(AlarmProtocol.VOICE_STATE_FIRE);
 					}
 					
 					if(alarm.getType() == Alarm.TYPE_TEMPERATURE_EXTREME_HIGH
@@ -1437,53 +1621,49 @@ public class TemServiceImpl implements TemService {
 							|| alarm.getType() == Alarm.TYPE_UNSTOCK_LOW){
 						_pro.setRelayState(AlarmProtocol.RELAY_STATE_ON);
 						
-						_pro.setLight(alarm.getLight());
-						if(StringUtils.equals(_pro.getLightState(), AlarmProtocol.LIGHT_STATE_FIRE)
-								|| StringUtils.equals(_pro.getLightState(), AlarmProtocol.LIGHT_STATE_GLITCH_FIRE))
+						if(_pro.getLightState() == AlarmProtocol.LIGHT_STATE_GLITCH
+								|| _pro.getLightState() == AlarmProtocol.LIGHT_STATE_GLITCH_FIRE)
 							_pro.setLightState(AlarmProtocol.LIGHT_STATE_GLITCH_FIRE);
-						else 
+						else
 							_pro.setLightState(AlarmProtocol.LIGHT_STATE_GLITCH);
 						
-						if(StringUtils.equals(gpioState, AlarmProtocol.GPIO_STATE_FIRE)
-								|| StringUtils.equals(_pro.getLightState(), AlarmProtocol.GPIO_STATE_ON))
-							gpioState = AlarmProtocol.GPIO_STATE_ON;
+						if(_pro.getVoiceState() == AlarmProtocol.VOICE_STATE_GLITCH
+								|| _pro.getVoiceState() == AlarmProtocol.VOICE_STATE_GLITCH_FIRE)
+							_pro.setVoiceState(AlarmProtocol.VOICE_STATE_GLITCH_FIRE);
 						else
-							gpioState = AlarmProtocol.GPIO_STATE_GLITCH;
+							_pro.setVoiceState(AlarmProtocol.VOICE_STATE_GLITCH);
 					}
 				
 					alarm.setStatus(Alarm.STATUS_ALARMED);
 				}
 				
-				StringBuilder sb = new StringBuilder(AlarmProtocol.HEADER);
-				sb.append(AlarmProtocol.ADDRESS_EXTENSION);
-				
+				List<Integer> states = new ArrayList<Integer>();
 				for(AlarmProtocol pro : protocols.values()){
-					sb.append(pro.getLight());
-					sb.append(pro.getLightState());
-					sb.append(pro.getRelay());
-					sb.append(pro.getRelayState());
-					sb.append(pro.getRelay1());
-					sb.append(pro.getRelay1State());
-					sb.append(pro.getVoice());
-					sb.append(pro.getVoiceState());
+					states.add(NumberUtils.toInt(pro.getLight()));
+					states.add(pro.getLightState());
+					states.add(NumberUtils.toInt(pro.getRelay()));
+					states.add(pro.getRelayState());
+					states.add(NumberUtils.toInt(pro.getRelay1()));
+					states.add(pro.getRelay1State());
+					states.add(NumberUtils.toInt(pro.getVoice()));
+					states.add(pro.getVoiceState());
 				}
+				
 				for(AreaHardwareConfig config : aHards.values()){
-					sb.append(config.getLight());
-					sb.append(AlarmProtocol.LIGHT_STATE_NORMAL);
-					sb.append(config.getRelay());
-					sb.append(AlarmProtocol.RELAY_STATE_OFF);
-					sb.append(config.getRelay1());
-					sb.append(AlarmProtocol.RELAY_STATE_OFF);
-					sb.append(config.getVoice());
-					sb.append(AlarmProtocol.VOICE_STATE_OFF);
+					states.add(NumberUtils.toInt(config.getLight()));
+					states.add(AlarmProtocol.LIGHT_STATE_OK);
+					states.add(NumberUtils.toInt(config.getRelay()));
+					states.add(AlarmProtocol.RELAY_STATE_OFF);
+					states.add(NumberUtils.toInt(config.getRelay1()));
+					states.add(AlarmProtocol.RELAY_STATE_OFF);
+					states.add(NumberUtils.toInt(config.getVoice()));
+					states.add(AlarmProtocol.VOICE_STATE_OFF);
 				}
 				
-				sb.append(AlarmProtocol.ADDRESS_GPIO);
-				sb.append(gpioState);
-				sb.append(AlarmProtocol.TAILER);
+				states.add(new Double(max).intValue());
 				
-				// TODO call DLL
-				System.out.println(sb.toString());
+				// call DLL
+				callAlarm(states, machine);
 				
 				// update alarms
 				alarmDao.updateAlarms(alarms);

@@ -33,4 +33,6 @@ public interface SqlConstants {
 	public static final String TABLE_TEMPERATURE_EVENT = DATABASE + ".`temperature_event`";
 
 	public static final String TABLE_ALARM = DATABASE + ".`alarm`";
+
+	public static final String TABLE_CHECK = DATABASE + ".`check`";
 }

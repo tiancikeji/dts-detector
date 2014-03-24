@@ -15,4 +15,8 @@ public interface TemService {
 	public void logTem();
 
 	public void eventTem();
+
+	public void initAlarm();
+
+	public void checkHardware();
 }

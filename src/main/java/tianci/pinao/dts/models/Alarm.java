@@ -74,6 +74,8 @@ public class Alarm {
 	
 	private double temperaturePre;
 	
+	private double temperatureMax;
+	
 	private int status;
 	
 	private Date addTime;
@@ -255,5 +257,13 @@ public class Alarm {
 
 	public void setAddTime(Date addTime) {
 		this.addTime = addTime;
+	}
+
+	public double getTemperatureMax() {
+		return temperatureMax;
+	}
+
+	public void setTemperatureMax(double temperatureMax) {
+		this.temperatureMax = temperatureMax;
 	}
 }

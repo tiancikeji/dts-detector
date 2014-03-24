@@ -102,6 +102,9 @@
 		init-method="init" destroy-method="destroy">
 		<property name="logService" ref="logService" />
 	</bean>
+    <bean id="initAlarmTask" class ="tianci.pinao.dts.tasks.InitAlarmTask" init-method="run">
+		<property name="temService" ref="temService" />
+    </bean>
 	    
     <!-- log & back up -->
     <!--bean id="readTemTask" class ="tianci.pinao.dts.tasks.ReadTemTask">

@@ -7,73 +7,47 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 public class AlarmProtocol {
 	
 	// light states
-	public static String LIGHT_STATE_OFF = "00";
+	public static int LIGHT_STATE_OFF = 0;
 	
-	public static String LIGHT_STATE_NORMAL = "01";
+	public static int LIGHT_STATE_OK = 1;
 	
-	public static String LIGHT_STATE_FIRE = "02";
+	public static int LIGHT_STATE_FIRE = 2;
 	
-	public static String LIGHT_STATE_GLITCH = "03";
+	public static int LIGHT_STATE_GLITCH = 3;
 	
-	public static String LIGHT_STATE_GLITCH_FIRE = "04";
-	
-	public static String LIGHT_STATE_ALL = "05";
-	
-	public static String LIGHT_STATE_RESET = "06";
+	public static int LIGHT_STATE_GLITCH_FIRE = 4;
 	
 	// relay states
-	public static String RELAY_STATE_ON = "01";
+	public static int RELAY_STATE_ON = 1;
 	
-	public static String RELAY_STATE_OFF = "00";
+	public static int RELAY_STATE_OFF = 0;
 	
 	// voice states
-	public static String VOICE_STATE_ON = "01";
-	
-	public static String VOICE_STATE_OFF = "00";
-	
-	// header
-	public static String HEADER = "<<";
+	public static int VOICE_STATE_FIRE = 1;
 
-	public static String TAILER = ">>";
+	public static int VOICE_STATE_GLITCH = 2;
+
+	public static int VOICE_STATE_GLITCH_FIRE = 1;
 	
-	// extension address
-	public static String ADDRESS_EXTENSION = "1";
-	
-	// reset
-	public static String ADDRESS_RESET = "99";
-	
-	public static String RESET_STATE_OFF = "00";
-	
-	public static String RESET_STATE_ON = "01";
-	
-	// GPIO
-	public static String ADDRESS_GPIO = "A1";
-	
-	public static String GPIO_STATE_OFF = "00";
-	
-	public static String GPIO_STATE_FIRE = "01";
-	
-	public static String GPIO_STATE_GLITCH = "02";
-	
-	public static String GPIO_STATE_ON = "04";
+	public static int VOICE_STATE_OFF = 0;
 	
 	private int channelId;
 	
 	private String light;
 	
-	private String lightState = LIGHT_STATE_NORMAL;
+	private int lightState = LIGHT_STATE_OK;
 	
 	private String relay;
 	
-	private String relayState = RELAY_STATE_OFF;
-	
-	private String voice;
-	
-	private String voiceState = VOICE_STATE_OFF;
+	private int relayState = RELAY_STATE_OFF;
 	
 	private String relay1;
 	
-	private String relay1State = RELAY_STATE_OFF;
+	private int relay1State = RELAY_STATE_OFF;
+	
+	private String voice;
+	
+	private int voiceState = VOICE_STATE_OFF;
 
 	public int getChannelId() {
 		return channelId;
@@ -91,11 +65,11 @@ public class AlarmProtocol {
 		this.light = light;
 	}
 
-	public String getLightState() {
+	public int getLightState() {
 		return lightState;
 	}
 
-	public void setLightState(String lightState) {
+	public void setLightState(int lightState) {
 		this.lightState = lightState;
 	}
 
@@ -107,11 +81,11 @@ public class AlarmProtocol {
 		this.relay = relay;
 	}
 
-	public String getRelayState() {
+	public int getRelayState() {
 		return relayState;
 	}
 
-	public void setRelayState(String relayState) {
+	public void setRelayState(int relayState) {
 		this.relayState = relayState;
 	}
 
@@ -123,11 +97,11 @@ public class AlarmProtocol {
 		this.voice = voice;
 	}
 
-	public String getVoiceState() {
+	public int getVoiceState() {
 		return voiceState;
 	}
 
-	public void setVoiceState(String voiceState) {
+	public void setVoiceState(int voiceState) {
 		this.voiceState = voiceState;
 	}
 
@@ -139,11 +113,11 @@ public class AlarmProtocol {
 		this.relay1 = relay1;
 	}
 
-	public String getRelay1State() {
+	public int getRelay1State() {
 		return relay1State;
 	}
 
-	public void setRelay1State(String relay1State) {
+	public void setRelay1State(int relay1State) {
 		this.relay1State = relay1State;
 	}
 
