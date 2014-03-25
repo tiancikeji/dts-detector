@@ -97,6 +97,9 @@
 	<bean id="logService" class="tianci.pinao.dts.services.impl.LogServiceImpl">
 		<property name="logDao" ref="logDao" />
 	</bean>
+	<bean id="configService" class="tianci.pinao.dts.services.impl.ConfigServiceImpl">
+		<property name="configDao" ref="configDao" />
+	</bean>
 	
 	<bean id="serverLifeTimeRecordTask" class="tianci.pinao.dts.tasks.ServerLifeTimeRecordTask" 
 		init-method="init" destroy-method="destroy">
@@ -104,6 +107,7 @@
 	</bean>
     <bean id="initAlarmTask" class ="tianci.pinao.dts.tasks.InitAlarmTask" init-method="run">
 		<property name="temService" ref="temService" />
+		<property name="configService" ref="configService" />
     </bean>
 	    
     <!-- log & back up -->
@@ -118,12 +122,15 @@
     </bean-->
     <bean id="temTask" class ="tianci.pinao.dts.tasks.TemTask">
 		<property name="temService" ref="temService" />
+		<property name="configService" ref="configService" />
     </bean>
     <bean id="ctrlTemTask" class ="tianci.pinao.dts.tasks.CtrlTemTask">
 		<property name="temService" ref="temService" />
+		<property name="configService" ref="configService" />
     </bean>
     <bean id="logTemTask" class ="tianci.pinao.dts.tasks.LogTemTask">
 		<property name="temService" ref="temService" />
+		<property name="configService" ref="configService" />
     </bean>
 
 	<!--bean id="readTemTaskJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">

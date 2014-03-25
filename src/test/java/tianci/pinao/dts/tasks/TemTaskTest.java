@@ -10,7 +10,7 @@ public class TemTaskTest extends TestCase {
 	private boolean flag = false;
 	
 	public void testTem(){
-		if(flag){
+		if(true){
 			TemTask task = new ClassPathXmlApplicationContext("applicationContext.xml").getBean("temTask", TemTask.class);
 			
 			task.run();

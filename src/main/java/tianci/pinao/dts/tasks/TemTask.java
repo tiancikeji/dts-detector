@@ -7,6 +7,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.stereotype.Service;
 
+import tianci.pinao.dts.services.ConfigService;
 import tianci.pinao.dts.services.TemService;
 
 @Service
@@ -16,12 +17,14 @@ public class TemTask implements Runnable {
 
 	private TemService temService;
 	
+	private ConfigService configService;
+	
 	private Lock lock = new ReentrantLock();
 	
     @Override
     public void run() {
     	try {
-    		if(lock.tryLock()){
+    		if(lock.tryLock() && configService.checkLifeTime()){
     			temService.readTem();
     			temService.saveTem();
     			temService.checkTem();
@@ -41,6 +44,14 @@ public class TemTask implements Runnable {
 
 	public void setTemService(TemService temService) {
 		this.temService = temService;
+	}
+
+	public ConfigService getConfigService() {
+		return configService;
+	}
+
+	public void setConfigService(ConfigService configService) {
+		this.configService = configService;
 	}
 
 }

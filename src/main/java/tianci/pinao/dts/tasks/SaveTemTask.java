@@ -6,6 +6,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import tianci.pinao.dts.services.ConfigService;
 import tianci.pinao.dts.services.TemService;
 
 public class SaveTemTask implements Runnable {
@@ -14,12 +15,14 @@ public class SaveTemTask implements Runnable {
 
 	private TemService temService;
 	
+	private ConfigService configService;
+	
 	private Lock lock = new ReentrantLock();
 	
     @Override
     public void run() {
     	try{
-    		if(lock.tryLock())
+    		if(lock.tryLock() && configService.checkLifeTime())
     			temService.saveTem();
     	} catch(Throwable t){
     		if(logger.isErrorEnabled())
@@ -35,6 +38,14 @@ public class SaveTemTask implements Runnable {
 
 	public void setTemService(TemService temService) {
 		this.temService = temService;
+	}
+
+	public ConfigService getConfigService() {
+		return configService;
+	}
+
+	public void setConfigService(ConfigService configService) {
+		this.configService = configService;
 	}
 
 }
