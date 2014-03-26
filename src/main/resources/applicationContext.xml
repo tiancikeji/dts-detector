@@ -32,22 +32,22 @@
 	
 	<bean id="dataSourceParent" destroy-method="close" abstract="true">
 		<property name="driverClass">
-			<value>#[jdbc.driverClassName]</value>
+			<value>com.mysql.jdbc.Driver</value>
 		</property>
 		<property name="maxPoolSize">
-			<value>#[default.maxPoolSize]</value>
+			<value>10</value>
 		</property>
 		<property name="minPoolSize">
-			<value>#[default.minPoolSize]</value>
+			<value>5</value>
 		</property>
 		<property name="initialPoolSize">
-			<value>#[default.initialPoolSize]</value>
+			<value>5</value>
 		</property>
 		<property name="idleConnectionTestPeriod">
-			<value>#[default.idleConnectionTestPeriod]</value>
+			<value>600</value>
 		</property>
 		<property name="maxIdleTime">
-			<value>#[default.maxIdleTime]</value>
+			<value>600</value>
 		</property>
 	</bean>
 	
@@ -195,7 +195,7 @@
 	    <property name="repeatCount" value="-1" />
 	</bean>
 	
-	<bean class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
+	<bean id="scheduler" class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
 		<property name="taskExecutor">
 			<bean class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
 				<property name="corePoolSize" value="40" />
@@ -207,8 +207,8 @@
 		<property name="triggers">
 			<list>
                 <!--<ref bean="temTaskTrigger" />
-                ref bean="ctrlTemTaskTrigger" />
-                <ref bean="logTemTaskTrigger" /-->
+                <ref bean="logTemTaskTrigger" />
+                <ref bean="ctrlTemTaskTrigger" />-->
 			</list>
 		</property>
 	</bean>

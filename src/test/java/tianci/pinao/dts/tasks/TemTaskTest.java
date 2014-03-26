@@ -10,7 +10,7 @@ public class TemTaskTest extends TestCase {
 	private boolean flag = false;
 	
 	public void testTem(){
-		if(true){
+		if(flag){
 			TemTask task = new ClassPathXmlApplicationContext("applicationContext.xml").getBean("temTask", TemTask.class);
 			
 			task.run();
@@ -72,7 +72,7 @@ public class TemTaskTest extends TestCase {
 	}
 	
 	public void testCheckHardware(){
-		if(true){
+		if(flag){
 			TemService task = getTemService();
 			
 			task.checkHardware();

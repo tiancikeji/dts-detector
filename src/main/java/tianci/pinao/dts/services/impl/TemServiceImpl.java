@@ -1503,7 +1503,7 @@ public class TemServiceImpl implements TemService {
 			}
 		} finally{
 			if(logger.isInfoEnabled())
-				logger.info("[DTS-ALARM-DLL]SendData for machine.id <" + machine.getId() + "> used <" + (System.currentTimeMillis() - start) + "> result <" + result + ">");
+				logger.info("[DTS-ALARM-DLL]SendData for machine.id <" + machine.getId() + "> used <" + (System.currentTimeMillis() - start) + "> result <" + result + "> param <" + StringUtils.join(states, "|") + ">");
 		}
 		
 		// close dll
