@@ -24,6 +24,8 @@ public class EventTemTask implements Runnable {
 		try {
 			if(lock.tryLock() && configService.checkLifeTime())
     			temService.eventTem();
+			else
+				logger.info("fail in check life time, next loop");
 		} catch (Throwable t) {
 			if(logger.isErrorEnabled())
 				logger.error("Error in eventing tem >> ", t);

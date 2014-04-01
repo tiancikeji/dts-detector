@@ -22,7 +22,7 @@ public class InitAlarmTask implements Runnable {
 	@Override
 	public void run() {
 		try {
-			if(lock.tryLock() && configService.checkLifeTime())
+			if(lock.tryLock()/* && configService.checkLifeTime()*/)
     			temService.initAlarm();
 		} catch (Throwable t) {
 			if(logger.isErrorEnabled())

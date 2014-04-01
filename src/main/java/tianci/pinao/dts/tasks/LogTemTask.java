@@ -24,6 +24,8 @@ public class LogTemTask implements Runnable {
 		try {
 			if(lock.tryLock() && configService.checkLifeTime())
     			temService.logTem();
+			else
+				logger.info("fail in check life time, next loop");
 		} catch (Throwable t) {
 			if(logger.isErrorEnabled())
 				logger.error("Error in logging tem >> ", t);

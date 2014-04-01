@@ -26,6 +26,8 @@ public class ReadTemTask implements Runnable {
     	try {
     		if(lock.tryLock() && configService.checkLifeTime())
     			temService.readTem();
+			else
+				logger.info("fail in check life time, next loop");
     	} catch (Throwable e) {
     		if(logger.isErrorEnabled())
     			logger.error("Exception when reading tem >> ", e);

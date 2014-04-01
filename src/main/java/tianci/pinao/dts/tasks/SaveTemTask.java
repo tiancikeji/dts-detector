@@ -24,6 +24,8 @@ public class SaveTemTask implements Runnable {
     	try{
     		if(lock.tryLock() && configService.checkLifeTime())
     			temService.saveTem();
+			else
+				logger.info("fail in check life time, next loop");
     	} catch(Throwable t){
     		if(logger.isErrorEnabled())
     			logger.error("Exception when saving term >> ", t);
