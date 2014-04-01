@@ -1,12 +1,11 @@
 package tianci.pinao.dts.util;
 
-import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 
 public class PinaoUtils {
 
-	public static String LOCAL_MAC_ADDRESS;
+	public static String LOCAL_MAC_ADDRESS = "unknown";
 	
 	static{
 		try {
@@ -26,7 +25,7 @@ public class PinaoUtils {
 				LOCAL_MAC_ADDRESS = LOCAL_MAC_ADDRESS.substring(0, LOCAL_MAC_ADDRESS.length() - 1);
 			}
 
-		} catch (IOException e) {
+		} catch (Throwable e) {
 			e.printStackTrace();
 		}
 	}
