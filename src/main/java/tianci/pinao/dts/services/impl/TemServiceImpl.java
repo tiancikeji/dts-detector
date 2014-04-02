@@ -82,8 +82,8 @@ public class TemServiceImpl implements TemService {
 
 	@Override
 	public void checkHardware() {
-		if(logger.isInfoEnabled())
-			logger.info("Starting check hardware");
+//		if(logger.isInfoEnabled())
+//			logger.info("Starting check hardware");
 		long start = System.currentTimeMillis();
 		
 		try{
@@ -163,8 +163,8 @@ public class TemServiceImpl implements TemService {
 	@Override
 	@Transactional(rollbackFor=Exception.class, value="txManager")
 	public void eventTem() {
-		if(logger.isInfoEnabled())
-			logger.info("Starting event tem");
+//		if(logger.isInfoEnabled())
+//			logger.info("Starting event tem");
 		long start = System.currentTimeMillis();
 		try{
 			// get data from temperature - last 2 hour's alarm time
@@ -200,8 +200,8 @@ public class TemServiceImpl implements TemService {
 	@Override
 	@Transactional(rollbackFor=Exception.class, value="txManager")
 	public void logTem() {
-		if(logger.isInfoEnabled())
-			logger.info("Starting log tem");
+//		if(logger.isInfoEnabled())
+//			logger.info("Starting log tem");
 		long start = System.currentTimeMillis();
 		try{
 			// get data from temperature - 1 hour ago & status:1
@@ -310,8 +310,8 @@ public class TemServiceImpl implements TemService {
 
 	@Override
 	public void saveTem() {
-		if(logger.isInfoEnabled())
-			logger.info("Starting save tem");
+//		if(logger.isInfoEnabled())
+//			logger.info("Starting save tem");
 		long start = System.currentTimeMillis();
 		try{
 	    	// read files
@@ -424,8 +424,8 @@ public class TemServiceImpl implements TemService {
 
 	@Override
 	public void readTem() {
-		if(logger.isInfoEnabled())
-			logger.info("Starting read tem for <" + machineId + ">");
+//		if(logger.isInfoEnabled())
+//			logger.info("Starting read tem for <" + machineId + ">");
 		long start = System.currentTimeMillis();
 		
 		try{
@@ -589,8 +589,8 @@ public class TemServiceImpl implements TemService {
 
 	@Override
 	public void checkTem() {
-		if(logger.isInfoEnabled())
-			logger.info("Starting check tem");
+//		if(logger.isInfoEnabled())
+//			logger.info("Starting check tem");
 		long start = System.currentTimeMillis();
 		
 		try{
@@ -1217,8 +1217,8 @@ public class TemServiceImpl implements TemService {
 	}
 
 	public void initAlarm(){
-		if(logger.isInfoEnabled())
-			logger.info("Starting init alarm");
+//		if(logger.isInfoEnabled())
+//			logger.info("Starting init alarm");
 		long start = System.currentTimeMillis();
 		
 		try{
@@ -1241,35 +1241,35 @@ public class TemServiceImpl implements TemService {
 		if(channels != null && channels.size() > 0){
 			for(Channel channel : channels)
 				cIds.add(channel.getId());
+		
+			// area channels
+			Map<Integer, List<AreaChannel>> aChannels = areaDao.getAChannelsByIds(cIds);
+			Set<Integer> aIds = new HashSet<Integer>();
+			if(aChannels != null && aChannels.size() > 0)
+				for(Integer cId : aChannels.keySet())
+					for(AreaChannel ac : aChannels.get(cId))
+						aIds.add(ac.getAreaid());
+			
+			// area hardware configs
+			Map<Integer, AreaHardwareConfig> aHards = areaDao.getAHardsByIds(aIds);
+	
+			List<Integer> states = new ArrayList<Integer>();
+			for(AreaHardwareConfig config : aHards.values()){
+				states.add(NumberUtils.toInt(config.getLight()));
+				states.add(AlarmProtocol.LIGHT_STATE_OK);
+				states.add(NumberUtils.toInt(config.getRelay()));
+				states.add(AlarmProtocol.RELAY_STATE_OFF);
+				states.add(NumberUtils.toInt(config.getRelay1()));
+				states.add(AlarmProtocol.RELAY_STATE_OFF);
+				states.add(NumberUtils.toInt(config.getVoice()));
+				states.add(AlarmProtocol.VOICE_STATE_OFF);
+			}
+			
+			states.add(0);
+			
+			// call DLL
+			callAlarm(states, machine);
 		}
-		
-		// area channels
-		Map<Integer, List<AreaChannel>> aChannels = areaDao.getAChannelsByIds(cIds);
-		Set<Integer> aIds = new HashSet<Integer>();
-		if(aChannels != null && aChannels.size() > 0)
-			for(Integer cId : aChannels.keySet())
-				for(AreaChannel ac : aChannels.get(cId))
-					aIds.add(ac.getAreaid());
-		
-		// area hardware configs
-		Map<Integer, AreaHardwareConfig> aHards = areaDao.getAHardsByIds(aIds);
-
-		List<Integer> states = new ArrayList<Integer>();
-		for(AreaHardwareConfig config : aHards.values()){
-			states.add(NumberUtils.toInt(config.getLight()));
-			states.add(AlarmProtocol.LIGHT_STATE_OK);
-			states.add(NumberUtils.toInt(config.getRelay()));
-			states.add(AlarmProtocol.RELAY_STATE_OFF);
-			states.add(NumberUtils.toInt(config.getRelay1()));
-			states.add(AlarmProtocol.RELAY_STATE_OFF);
-			states.add(NumberUtils.toInt(config.getVoice()));
-			states.add(AlarmProtocol.VOICE_STATE_OFF);
-		}
-		
-		states.add(0);
-		
-		// call DLL
-		callAlarm(states, machine);
 	}
 
 	private boolean checkHighGlitch(Config config, double tem) {
@@ -1291,8 +1291,8 @@ public class TemServiceImpl implements TemService {
 	
 	@Override
 	public void ctrlTem() {
-		if(logger.isInfoEnabled())
-			logger.info("Starting ctrl tem");
+//		if(logger.isInfoEnabled())
+//			logger.info("Starting ctrl tem");
 		long start = System.currentTimeMillis();
 		
 		try{

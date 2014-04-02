@@ -206,9 +206,9 @@
 		</property>
 		<property name="triggers">
 			<list>
-                <!--<ref bean="temTaskTrigger" />
+                <ref bean="temTaskTrigger" />
                 <ref bean="logTemTaskTrigger" />
-                <ref bean="ctrlTemTaskTrigger" />-->
+                <ref bean="ctrlTemTaskTrigger" />
 			</list>
 		</property>
 	</bean>
