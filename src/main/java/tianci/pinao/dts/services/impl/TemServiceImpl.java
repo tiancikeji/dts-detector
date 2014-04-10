@@ -708,7 +708,7 @@ public class TemServiceImpl implements TemService {
 						Map<Integer, Map<Integer, Double>> _currAreaTems = new HashMap<Integer, Map<Integer,Double>>();
 						Map<Integer, Map<Integer, Double>> _preAreaTems = new HashMap<Integer, Map<Integer,Double>>();
 						
-						for(int i = 0; i <= _tems.length; i ++){
+						for(int i = 0; i < _tems.length; i ++){
 							AreaChannel _channel = findAreaChannel(_channels, i + 1);
 							if(_channel != null){
 								AreaTempConfig tempConfig = aTemps.get(_channel.getAreaid());
