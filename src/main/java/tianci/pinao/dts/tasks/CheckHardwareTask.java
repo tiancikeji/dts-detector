@@ -25,12 +25,16 @@ public class CheckHardwareTask implements Runnable {
 			if(lock.tryLock() && configService.checkLifeTime())
     			temService.checkHardware();
 			else
-				logger.info("fail in check life time, next loop");
+				logger.info("fail in check hardware, next loop");
 		} catch (Throwable t) {
 			if(logger.isErrorEnabled())
 				logger.error("Error in checking hardware >> ", t);
 		} finally{
-    		lock.unlock();
+			try{
+				lock.unlock();
+			} catch(Throwable t){
+				// left blank;
+			}
     	}
 	}
 

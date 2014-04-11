@@ -28,7 +28,11 @@ public class InitAlarmTask implements Runnable {
 			if(logger.isErrorEnabled())
 				logger.error("Error in init alarm >> ", t);
 		} finally{
-    		lock.unlock();
+			try{
+				lock.unlock();
+			} catch(Throwable t){
+				// left blank;
+			}
     	}
 	}
 

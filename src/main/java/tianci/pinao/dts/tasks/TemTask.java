@@ -30,12 +30,16 @@ public class TemTask implements Runnable {
     			temService.checkTem();
     			temService.alarmTem();
     		} else
-				logger.info("fail in check life time, next loop");
+				logger.info("fail in circle tem, next loop");
     	} catch (Throwable e) {
     		if(logger.isErrorEnabled())
     			logger.error("Exception when circle tem >> ", e);
     	} finally{
-    		lock.unlock();
+			try{
+				lock.unlock();
+			} catch(Throwable t){
+				// left blank;
+			}
     	}
     }
 
