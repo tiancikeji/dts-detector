@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -1495,6 +1496,7 @@ public class TemServiceImpl implements TemService {
 		result = false;
 		try{
 			if(alarm != null){
+				states = uniqueStates(states);
 				int[] _states = new int[states.size()];
 				for(int i = 0; i < states.size(); i ++)
 					_states[i] = states.get(i);
@@ -1518,6 +1520,30 @@ public class TemServiceImpl implements TemService {
 			if(logger.isInfoEnabled())
 				logger.info("[DTS-ALARM-DLL]ClosePort for machine.id <" + machine.getId() + "> used <" + (System.currentTimeMillis() - start) + "> result <" + result + ">");
 		}
+	}
+
+	private static List<Integer> uniqueStates(List<Integer> states) {
+		List<Integer> result = new ArrayList<Integer>();
+		
+		Map<Integer, Integer> tmps = new LinkedHashMap<Integer, Integer>();
+		for(int i = 0; i < states.size() - 1;){
+			Integer key = states.get(i);
+			Integer value = states.get(i + 1);
+
+			Integer tmp = tmps.get(key);
+			if(tmp == null || tmp < value)
+				tmps.put(key, value);
+			
+			i = i + 2;
+		}
+		
+		for(Integer key : tmps.keySet()){
+			result.add(key);
+			result.add(tmps.get(key));
+		}
+		result.add(states.get(states.size() - 1));
+		
+		return result;
 	}
 
 	@Override
